@@ -5,7 +5,7 @@ import { buildAuthorizeUrl } from "@/lib/sso";
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
-  // Strip the basePath (/requests) before matching routes so the proxy works
+  // Strip the basePath (/logrequest) before matching routes so the proxy works
   // identically when the app is served behind Apache with a prefix.
   const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
   const p =
