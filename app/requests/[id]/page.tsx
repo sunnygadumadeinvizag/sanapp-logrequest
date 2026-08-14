@@ -63,7 +63,9 @@ export default async function RequestDetailPage({
     r.assignedPocId === me.id;
   if (!canView) notFound();
 
-  // POC options for "move to another POC" — other POCs of the same category.
+  // POC options for "move to another POC". The assigner picks a primary
+  // role (SSO role) first, then a person by name — the platform role
+  // (POC/ADMIN/USER) is not used for this selection.
   const pocOptions = await prisma.pocAssignment.findMany({
     where: {
       active: true,
@@ -72,12 +74,13 @@ export default async function RequestDetailPage({
         { subCategoryId: null, categoryId: r.categoryId },
       ],
     },
-    include: { user: { select: { id: true, username: true, name: true } } },
+    include: { user: { select: { id: true, username: true, name: true, primaryRole: true } } },
   });
   const otherPocs = me.role === "ADMIN"
     ? await prisma.appUser.findMany({
-        where: { role: { in: ["POC", "ADMIN"] } },
-        select: { id: true, username: true, name: true },
+        where: { primaryRole: { not: null } },
+        select: { id: true, username: true, name: true, primaryRole: true },
+        orderBy: [{ primaryRole: "asc" }, { name: "asc" }],
       })
     : pocOptions.map((p) => p.user).filter((u) => u.id !== me.id);
 
@@ -168,7 +171,12 @@ export default async function RequestDetailPage({
         }}
         me={{ username: me.username, name: me.name }}
         role={me.role as "ADMIN" | "POC" | "USER"}
-        pocOptions={otherPocs.map((u) => ({ id: u.id, name: u.name, username: u.username }))}
+        pocOptions={otherPocs.map((u) => ({
+          id: u.id,
+          name: u.name,
+          username: u.username,
+          primaryRole: u.primaryRole ?? "",
+        }))}
       />
 
       {/* Timeline */}

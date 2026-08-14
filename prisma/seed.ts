@@ -10,20 +10,20 @@ async function main() {
   // SSO callback only updates identity fields.
   // ------------------------------------------------------------------
   const users = [
-    { username: "admin", name: "System Administrator", role: "ADMIN" as const },
-    { username: "sanyasi", name: "Sanyasi Naidu", role: "POC" as const },
-    { username: "ramesh", name: "Ramesh Kumar", role: "POC" as const },
-    { username: "lakshmi", name: "Lakshmi Devi", role: "POC" as const },
-    { username: "geeta", name: "Geeta Sharma", role: "USER" as const },
-    { username: "kiran", name: "Kiran Rao", role: "USER" as const },
-    { username: "venkat", name: "Venkat Reddy", role: "USER" as const },
+    { username: "admin", name: "System Administrator", role: "ADMIN" as const, primaryRole: "STAFF_NON_TEACHING" },
+    { username: "sanyasi", name: "Sanyasi Naidu", role: "POC" as const, primaryRole: "STAFF_TEACHING" },
+    { username: "ramesh", name: "Ramesh Kumar", role: "POC" as const, primaryRole: "STUDENT" },
+    { username: "lakshmi", name: "Lakshmi Devi", role: "POC" as const, primaryRole: "STAFF_NON_TEACHING" },
+    { username: "geeta", name: "Geeta Sharma", role: "USER" as const, primaryRole: "SCHOLAR" },
+    { username: "kiran", name: "Kiran Rao", role: "USER" as const, primaryRole: "STAFF_TEACHING" },
+    { username: "venkat", name: "Venkat Reddy", role: "USER" as const, primaryRole: "STAFF_NON_TEACHING" },
   ] as const;
 
   for (const u of users) {
     await prisma.appUser.upsert({
       where: { username: u.username },
-      update: { name: u.name, role: u.role },
-      create: { username: u.username, name: u.name, role: u.role },
+      update: { name: u.name, role: u.role, primaryRole: u.primaryRole },
+      create: { username: u.username, name: u.name, role: u.role, primaryRole: u.primaryRole },
     });
   }
   console.log(`  users: ${users.map((u) => u.username).join(", ")}`);

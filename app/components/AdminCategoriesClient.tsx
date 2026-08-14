@@ -5,7 +5,23 @@ import { apiPath } from "iipe-common-ui";
 import { PRIMARY_ROLE_LABELS } from "@/lib/labels";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Loader2, Plus, Trash2, ChevronDown, ChevronUp, UserPlus } from "lucide-react";
 
 const ALL_ROLES = ["STAFF_TEACHING", "STAFF_NON_TEACHING", "STUDENT", "SCHOLAR", "GUEST"];
 
@@ -27,6 +43,12 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
   const [err, setErr] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
+
+  // Assign-POC dialog state (primary role first, then pick by name).
+  const [pocDialog, setPocDialog] = useState<{ catId: string; subId: string | null } | null>(null);
+  const [pocRole, setPocRole] = useState("");
+  const [pocUsername, setPocUsername] = useState("");
+  const [pocOrder, setPocOrder] = useState("1");
 
   const flash = (ok: boolean, t: string) => {
     setMsg(ok ? t : null);
@@ -91,16 +113,26 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
     setCats((await r.json()).categories);
   }
 
-  async function addPoc(catId: string, subId: string | null) {
-    const username = prompt("SSO username of the POC (e.g. sanyasi):");
-    if (!username?.trim()) return;
-    const order = prompt("Queue order (1 = first, first come first served):") ?? "1";
+  function openAssignPoc(catId: string, subId: string | null) {
+    setPocRole("");
+    setPocUsername("");
+    setPocOrder("1");
+    setPocDialog({ catId, subId });
+  }
+
+  async function assignPoc() {
+    if (!pocDialog || !pocUsername.trim()) return;
     setBusy(true);
     try {
       const res = await fetch(apiPath("/api/admin/pocs"), {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ username: username.trim(), categoryId: catId, subCategoryId: subId, queueOrder: Number(order) || 1 }),
+        body: JSON.stringify({
+          username: pocUsername.trim(),
+          categoryId: pocDialog.catId,
+          subCategoryId: pocDialog.subId,
+          queueOrder: Number(pocOrder) || 1,
+        }),
       });
       const d = await res.json();
       if (!res.ok) {
@@ -108,6 +140,7 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
         return;
       }
       flash(true, "POC assigned");
+      setPocDialog(null);
       const r = await fetch(apiPath("/api/categories"), { cache: "no-store" });
       setCats((await r.json()).categories);
     } finally {
@@ -136,6 +169,10 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
     save(catId, { allowedRoles: next });
     setCats((cs) => cs.map((c) => (c.id === catId ? { ...c, allowedRoles: next } : c)));
   }
+
+  const assignableUsers = pocRole
+    ? ssoUsers.filter((u) => u.primaryRole === pocRole)
+    : ssoUsers;
 
   return (
     <div className="space-y-4">
@@ -202,8 +239,8 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
                           </button>
                         </div>
                       ))}
-                      <Button variant="outline" size="sm" onClick={() => addPoc(c.id, null)} disabled={busy}>
-                        <Plus className="mr-1 h-3 w-3" /> Assign POC
+                      <Button variant="outline" size="sm" onClick={() => openAssignPoc(c.id, null)} disabled={busy}>
+                        <UserPlus className="mr-1 h-3 w-3" /> Assign POC
                       </Button>
                     </div>
                   </div>
@@ -216,7 +253,7 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
                         <div key={s.id} className="rounded-md border px-2 py-1 text-sm">
                           <div className="flex items-center justify-between">
                             <span className="font-medium">{s.name}</span>
-                            <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]" onClick={() => addPoc(c.id, s.id)} disabled={busy}>
+                            <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]" onClick={() => openAssignPoc(c.id, s.id)} disabled={busy}>
                               <Plus className="mr-1 h-3 w-3" /> POC
                             </Button>
                           </div>
@@ -253,6 +290,76 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
           </div>
         </details>
       )}
+
+      {/* Assign POC dialog — pick a primary role, then a person by name */}
+      <Dialog open={pocDialog !== null} onOpenChange={(o) => !o && setPocDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign a POC</DialogTitle>
+            <DialogDescription>
+              Choose the person&apos;s primary role first, then select them by name. The platform role (POC/Admin/User) is not used here.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="poc-role">Primary role (SSO)</Label>
+              <Select value={pocRole || undefined} onValueChange={(v) => { setPocRole(v); setPocUsername(""); }}>
+                <SelectTrigger id="poc-role">
+                  <SelectValue placeholder="Select a primary role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ALL_ROLES.map((r) => (
+                    <SelectItem key={r} value={r}>{PRIMARY_ROLE_LABELS[r] ?? r}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="poc-user">Person by name</Label>
+              {ssoUsers.length > 0 ? (
+                <Select value={pocUsername || undefined} onValueChange={setPocUsername}>
+                  <SelectTrigger id="poc-user">
+                    <SelectValue placeholder={pocRole ? "Select a person" : "Choose a primary role first"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {assignableUsers.length === 0 && (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">No users found for this role</div>
+                    )}
+                    {assignableUsers.map((u) => (
+                      <SelectItem key={u.username} value={u.username}>{u.name} ({u.username})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  id="poc-user"
+                  placeholder="SSO username (e.g. sanyasi)"
+                  value={pocUsername}
+                  onChange={(e) => setPocUsername(e.target.value)}
+                />
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="poc-order">Queue order (1 = first, first come first served)</Label>
+              <Input
+                id="poc-order"
+                type="number"
+                min={1}
+                value={pocOrder}
+                onChange={(e) => setPocOrder(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPocDialog(null)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button onClick={assignPoc} disabled={busy || !pocUsername.trim()}>
+              {busy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <UserPlus className="mr-1 h-3 w-3" />} Assign POC
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

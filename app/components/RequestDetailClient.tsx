@@ -65,7 +65,7 @@ export function RequestDetailClient({
   data: DetailData;
   me: { username: string; name: string };
   role: "ADMIN" | "POC" | "USER";
-  pocOptions: { id: string; name: string; username: string }[];
+  pocOptions: { id: string; name: string; username: string; primaryRole?: string }[];
 }) {
   const router = useRouter();
   const { request } = data;
@@ -89,6 +89,7 @@ export function RequestDetailClient({
   const [logOpen, setLogOpen] = useState(false);
   const [logMinutes, setLogMinutes] = useState("15");
   const [moveOpen, setMoveOpen] = useState(false);
+  const [moveRole, setMoveRole] = useState("");
   const [movePoc, setMovePoc] = useState("");
   const [moveReason, setMoveReason] = useState("");
 
@@ -217,6 +218,7 @@ export function RequestDetailClient({
       }
       flash(true, "Request moved");
       setMoveOpen(false);
+      setMoveRole("");
       setMovePoc("");
       setMoveReason("");
       router.refresh();
@@ -251,6 +253,10 @@ export function RequestDetailClient({
   }
 
   const otherPocs = pocOptions.filter((p) => p.username !== me.username);
+  const roles = Array.from(
+    new Set(otherPocs.map((p) => p.primaryRole).filter(Boolean) as string[])
+  ).sort();
+  const roleFiltered = moveRole ? otherPocs.filter((p) => p.primaryRole === moveRole) : otherPocs;
 
   return (
     <div className="space-y-4">
@@ -327,7 +333,7 @@ export function RequestDetailClient({
                   </Button>
                   <Select
                     value={movePoc || undefined}
-                    onValueChange={(v) => { setMovePoc(v); setMoveReason(""); setMoveOpen(true); }}
+                    onValueChange={(v) => { setMoveRole(""); setMovePoc(v); setMoveReason(""); setMoveOpen(true); }}
                   >
                     <SelectTrigger className="h-8 w-52 text-xs">
                       <SelectValue placeholder="Move to another POC…" />
@@ -337,7 +343,9 @@ export function RequestDetailClient({
                         <div className="px-3 py-2 text-xs text-muted-foreground">No other POCs available</div>
                       )}
                       {otherPocs.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}{p.primaryRole ? ` (${p.primaryRole.replace(/_/g, " ").toLowerCase()})` : ""}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -534,14 +542,33 @@ export function RequestDetailClient({
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-2">
-              <Label htmlFor="move-poc">Target POC</Label>
-              <Select value={movePoc || undefined} onValueChange={setMovePoc}>
-                <SelectTrigger id="move-poc">
-                  <SelectValue placeholder="Select a POC" />
+              <Label htmlFor="move-role">Primary role (SSO)</Label>
+              <Select
+                value={moveRole || undefined}
+                onValueChange={(v) => { setMoveRole(v); setMovePoc(""); }}
+              >
+                <SelectTrigger id="move-role">
+                  <SelectValue placeholder="Any primary role" />
                 </SelectTrigger>
                 <SelectContent>
-                  {otherPocs.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  {roles.map((r) => (
+                    <SelectItem key={r} value={r}>{r.replace(/_/g, " ").toLowerCase()}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="move-poc">Person by name</Label>
+              <Select value={movePoc || undefined} onValueChange={setMovePoc}>
+                <SelectTrigger id="move-poc">
+                  <SelectValue placeholder="Select a person" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roleFiltered.length === 0 && (
+                    <div className="px-3 py-2 text-xs text-muted-foreground">No POCs for this role</div>
+                  )}
+                  {roleFiltered.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name} ({p.username})</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

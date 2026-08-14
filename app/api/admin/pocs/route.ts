@@ -69,8 +69,24 @@ export async function POST(request: NextRequest) {
   const subCategoryId = body.subCategoryId ? String(body.subCategoryId) : null;
   const queueOrder = Math.max(0, Number(body.queueOrder ?? 1) || 1);
 
-  const user = await prisma.appUser.findUnique({ where: { username } });
-  if (!user) return NextResponse.json({ error: "user_not_found" }, { status: 404 });
+  // The user may not have signed into App5 yet (they get an appUser row on
+  // first login). Look the identity up in the central SSO registry and create
+  // the local row from it, so a POC can be assigned purely by SSO primary role.
+  let user = await prisma.appUser.findUnique({ where: { username } });
+  if (!user) {
+    const sso = (await listSsoUsers()).find((u) => u.username === username);
+    if (!sso) return NextResponse.json({ error: "user_not_found" }, { status: 404 });
+    user = await prisma.appUser.create({
+      data: {
+        ssoUserId: sso.id,
+        username: sso.username,
+        name: sso.name,
+        email: sso.email,
+        primaryRole: sso.primaryRole,
+        role: "POC",
+      },
+    });
+  }
   const category = await prisma.category.findUnique({ where: { id: categoryId } });
   if (!category) return NextResponse.json({ error: "category_not_found" }, { status: 404 });
   if (subCategoryId) {
