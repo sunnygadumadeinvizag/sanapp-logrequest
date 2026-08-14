@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -40,6 +41,11 @@ import {
   MailOpen,
   History,
   ArrowRightLeft,
+  MapPin,
+  Dices,
+  UserPlus,
+  Users,
+  Plus,
 } from "lucide-react";
 
 export type DetailData = {
@@ -53,24 +59,48 @@ export type DetailData = {
   };
   comments: { id: string; body: string; readByMe: boolean; user: { name: string; username: string }; createdAt: string }[];
   attachments: { id: string; name: string; mime: string; size: number }[];
-  workLogs: { id: string; minutes: number; running: boolean; note: string | null; startedAt: string; endedAt: string | null; poc: { name: string } }[];
+  workLogs: {
+    id: string;
+    minutes: number;
+    running: boolean;
+    note: string | null;
+    location: string | null;
+    inCampus: boolean;
+    startedAt: string;
+    endedAt: string | null;
+    poc: { name: string };
+  }[];
 };
+
+type WorkerRow = { id: string; userId: string; username: string; name: string; primaryRole?: string };
+
+type LogEntry = { from: string; to: string; location: string; inCampus: boolean };
+
+function toLocalInput(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 export function RequestDetailClient({
   data,
   me,
   role,
   pocOptions,
+  workers,
+  isWorker,
 }: {
   data: DetailData;
   me: { username: string; name: string };
   role: "ADMIN" | "POC" | "USER";
   pocOptions: { id: string; name: string; username: string; primaryRole?: string }[];
+  workers: WorkerRow[];
+  isWorker: boolean;
 }) {
   const router = useRouter();
   const { request } = data;
   const isPoc = role === "POC" || role === "ADMIN";
   const isAssignee = request.assignedPoc?.username === me.username;
+  const canWork = isPoc || isWorker;
 
   const [comments, setComments] = useState(data.comments);
   const [commentText, setCommentText] = useState("");
@@ -84,14 +114,19 @@ export function RequestDetailClient({
   );
   const [elapsed, setElapsed] = useState(0);
   const [note, setNote] = useState("");
+  const [location, setLocation] = useState("");
+  const [inCampus, setInCampus] = useState(true);
 
   // Dialogs (shadcn) replace the old window.prompt() calls.
   const [logOpen, setLogOpen] = useState(false);
-  const [logMinutes, setLogMinutes] = useState("15");
+  const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
   const [moveOpen, setMoveOpen] = useState(false);
   const [moveRole, setMoveRole] = useState("");
   const [movePoc, setMovePoc] = useState("");
   const [moveReason, setMoveReason] = useState("");
+  const [workerOpen, setWorkerOpen] = useState(false);
+  const [workerRole, setWorkerRole] = useState("");
+  const [workerUser, setWorkerUser] = useState("");
 
   useEffect(() => {
     if (!running) return;
@@ -148,17 +183,19 @@ export function RequestDetailClient({
     setComments((cs) => cs.map((c) => (c.id === cid ? { ...c, readByMe: read } : c)));
   }
 
-  async function work(action: "start" | "stop" | "log", minutes?: number) {
+  async function work(action: "start" | "stop") {
     setBusy(true);
     try {
+      const body: Record<string, unknown> = {
+        action,
+        note: note || undefined,
+        location: location || undefined,
+        inCampus,
+      };
       const res = await fetch(apiPath(`/api/requests/${request.id}/work`), {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          action,
-          note: note || undefined,
-          minutes: action === "log" ? minutes : undefined,
-        }),
+        body: JSON.stringify(body),
       });
       const d = await res.json();
       if (!res.ok) {
@@ -172,10 +209,53 @@ export function RequestDetailClient({
       } else if (action === "stop") {
         setRunning(null);
         flash(true, `Work logged: ${fmtMinutes(d.minutes ?? 0)}`);
-      } else {
-        flash(true, `Logged ${fmtMinutes(d.minutes ?? 0)}`);
       }
       setNote("");
+      setLocation("");
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitLogEntries() {
+    const valid = logEntries.filter((e) => e.from && e.to);
+    if (valid.length === 0) {
+      flash(false, "Add at least one from/to range.");
+      return;
+    }
+    for (const e of valid) {
+      if (new Date(e.to).getTime() <= new Date(e.from).getTime()) {
+        flash(false, "In each range, 'to' must be after 'from'.");
+        return;
+      }
+    }
+    setBusy(true);
+    try {
+      const res = await fetch(apiPath(`/api/requests/${request.id}/work`), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "log",
+          note: note || undefined,
+          entries: valid.map((e) => ({
+            from: new Date(e.from).toISOString(),
+            to: new Date(e.to).toISOString(),
+            location: e.location || null,
+            inCampus: e.inCampus,
+          })),
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        flash(false, d?.error ?? "Could not log time");
+        return;
+      }
+      flash(true, `Logged ${fmtMinutes(d.minutes ?? 0)} across ${d.count ?? 1} session${(d.count ?? 1) > 1 ? "s" : ""}`);
+      setLogOpen(false);
+      setLogEntries([]);
+      setNote("");
+      setLocation("");
       router.refresh();
     } finally {
       setBusy(false);
@@ -227,6 +307,65 @@ export function RequestDetailClient({
     }
   }
 
+  async function randomAssign() {
+    setBusy(true);
+    try {
+      const res = await fetch(apiPath(`/api/requests/${request.id}`), {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ assignRandomly: true, moveReason: "Random assignment" }),
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        flash(false, d?.error === "no_poc_available" ? "No other POC is available." : d?.error ?? "Random assign failed");
+        return;
+      }
+      flash(true, `Assigned to ${d.request.assignedPoc?.name ?? "a POC"}`);
+      setMoveOpen(false);
+      setMoveRole("");
+      setMovePoc("");
+      setMoveReason("");
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function addWorker() {
+    if (!workerUser) return;
+    setBusy(true);
+    try {
+      const res = await fetch(apiPath(`/api/requests/${request.id}/workers`), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ userId: workerUser }),
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        flash(false, d?.error ?? "Could not add co-worker");
+        return;
+      }
+      flash(true, "Co-worker added");
+      setWorkerOpen(false);
+      setWorkerRole("");
+      setWorkerUser("");
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeWorker(userId: string) {
+    setBusy(true);
+    try {
+      await fetch(apiPath(`/api/requests/${request.id}/workers?userId=${userId}`), { method: "DELETE" });
+      flash(true, "Co-worker removed");
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function uploadAttachment(file: File) {
     if (file.size > 1024 * 1024) {
       flash(false, "File must be 1 MB or smaller.");
@@ -258,6 +397,20 @@ export function RequestDetailClient({
   ).sort();
   const roleFiltered = moveRole ? otherPocs.filter((p) => p.primaryRole === moveRole) : otherPocs;
 
+  const workerRoles = Array.from(
+    new Set(pocOptions.map((p) => p.primaryRole).filter(Boolean) as string[])
+  ).sort();
+  const workerFiltered = workerRole
+    ? pocOptions.filter((p) => p.primaryRole === workerRole && p.username !== me.username && !workers.some((w) => w.userId === p.id))
+    : [];
+
+  function openLogDialog() {
+    const now = new Date();
+    const from = new Date(now.getTime() - 30 * 60000);
+    setLogEntries([{ from: toLocalInput(from), to: toLocalInput(now), location: location, inCampus: true }]);
+    setLogOpen(true);
+  }
+
   return (
     <div className="space-y-4">
       {(msg || err) && (
@@ -278,7 +431,7 @@ export function RequestDetailClient({
         </span>
       </div>
 
-      {isPoc && (
+      {canWork && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm">POC actions</CardTitle>
@@ -302,17 +455,28 @@ export function RequestDetailClient({
                   </Button>
                 )
               )}
-              {!running && isAssignee && (
-                <Button size="sm" variant="outline" onClick={() => { setLogMinutes("15"); setLogOpen(true); }} disabled={busy}>
-                  <Clock className="mr-1 h-3 w-3" /> Log time manually
-                </Button>
-              )}
+              <Button size="sm" variant="outline" onClick={openLogDialog} disabled={busy}>
+                <Clock className="mr-1 h-3 w-3" /> Log time manually
+              </Button>
               <Input
                 placeholder="Note (optional)"
-                className="h-8 w-48"
+                className="h-8 w-44"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
               />
+              <Input
+                placeholder="Location (e.g. Room 204, Site visit)"
+                className="h-8 w-56"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+              />
+              <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+                <Checkbox
+                  checked={inCampus}
+                  onCheckedChange={(v) => setInCampus(v === true)}
+                />
+                {inCampus ? "In campus" : "Outside campus"}
+              </label>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -349,6 +513,15 @@ export function RequestDetailClient({
                       ))}
                     </SelectContent>
                   </Select>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={randomAssign}
+                    disabled={busy || otherPocs.length === 0}
+                    title="Randomly assign among the eligible POCs"
+                  >
+                    <Dices className="mr-1 h-3 w-3" /> Random
+                  </Button>
                 </>
               )}
               {request.status === "RESOLVED" && (isPoc || isAssignee) && (
@@ -356,7 +529,31 @@ export function RequestDetailClient({
                   Confirm & close
                 </Button>
               )}
+              {isAssignee && (
+                <Button size="sm" variant="outline" onClick={() => { setWorkerRole(""); setWorkerUser(""); setWorkerOpen(true); }} disabled={busy}>
+                  <UserPlus className="mr-1 h-3 w-3" /> Add co-worker
+                </Button>
+              )}
             </div>
+
+            {workers.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                {workers.map((w) => (
+                  <span key={w.id} className="inline-flex items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 text-xs">
+                    {w.name}
+                    <button
+                      onClick={() => removeWorker(w.userId)}
+                      disabled={busy}
+                      className="text-muted-foreground hover:text-red-600"
+                      title="Remove co-worker"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -470,11 +667,19 @@ export function RequestDetailClient({
               {data.workLogs.length === 0 && <p className="text-sm text-muted-foreground">No work logged yet.</p>}
               {data.workLogs.map((w) => (
                 <div key={w.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                  <div>
+                  <div className="min-w-0">
                     <span className="font-medium">{w.poc.name}</span>
                     {w.note && <span className="text-muted-foreground"> — {w.note}</span>}
+                    {w.location && (
+                      <span className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                        <MapPin className="h-3 w-3" /> {w.location}
+                        <Badge variant={w.inCampus ? "outline" : "secondary"} className="ml-1 text-[10px]">
+                          {w.inCampus ? "In campus" : "Outside campus"}
+                        </Badge>
+                      </span>
+                    )}
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex shrink-0 items-center gap-3">
                     {w.running && <Badge className="animate-pulse">Running</Badge>}
                     <span className="text-xs text-muted-foreground">
                       {new Date(w.startedAt).toLocaleString("en-IN")}
@@ -489,43 +694,75 @@ export function RequestDetailClient({
         </TabsContent>
       </Tabs>
 
-      {/* Log time dialog */}
+      {/* Log time dialog — multiple from/to ranges, each with location + in/out campus */}
       <Dialog open={logOpen} onOpenChange={setLogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Log time manually</DialogTitle>
             <DialogDescription>
-              Record time already spent on this request (in minutes). It is added to the work history.
+              Add one or more from/to ranges with the location. Mark whether the work was in campus or outside campus.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="log-minutes">Minutes worked</Label>
-            <Input
-              id="log-minutes"
-              type="number"
-              min={1}
-              max={480}
-              value={logMinutes}
-              onChange={(e) => setLogMinutes(e.target.value)}
-            />
+          <div className="space-y-3">
+            {logEntries.map((e, i) => (
+              <div key={i} className="space-y-2 rounded-md border p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-muted-foreground">Range {i + 1}</span>
+                  {logEntries.length > 1 && (
+                    <button
+                      onClick={() => setLogEntries((es) => es.filter((_, j) => j !== i))}
+                      className="text-muted-foreground hover:text-red-600"
+                      title="Remove range"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">From</Label>
+                    <Input
+                      type="datetime-local"
+                      value={e.from}
+                      onChange={(ev) => setLogEntries((es) => es.map((x, j) => (j === i ? { ...x, from: ev.target.value } : x)))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">To</Label>
+                    <Input
+                      type="datetime-local"
+                      value={e.to}
+                      onChange={(ev) => setLogEntries((es) => es.map((x, j) => (j === i ? { ...x, to: ev.target.value } : x)))}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Location</Label>
+                  <Input
+                    placeholder="e.g. Room 204, Site visit"
+                    value={e.location}
+                    onChange={(ev) => setLogEntries((es) => es.map((x, j) => (j === i ? { ...x, location: ev.target.value } : x)))}
+                  />
+                </div>
+                <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+                  <Checkbox
+                    checked={e.inCampus}
+                    onCheckedChange={(v) => setLogEntries((es) => es.map((x, j) => (j === i ? { ...x, inCampus: v === true } : x)))}
+                  />
+                  {e.inCampus ? "In campus" : "Outside campus"}
+                </label>
+              </div>
+            ))}
+            <Button size="sm" variant="outline" onClick={() => setLogEntries((es) => [...es, { from: "", to: "", location: "", inCampus: true }])}>
+              <Plus className="mr-1 h-3 w-3" /> Add another range
+            </Button>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setLogOpen(false)} disabled={busy}>
               Cancel
             </Button>
-            <Button
-              onClick={() => {
-                const mins = Number(logMinutes);
-                if (!mins || mins < 1) {
-                  flash(false, "Enter a valid number of minutes.");
-                  return;
-                }
-                setLogOpen(false);
-                work("log", mins);
-              }}
-              disabled={busy}
-            >
-              <Check className="mr-1 h-3 w-3" /> Log {fmtMinutes(Number(logMinutes) || 0)}
+            <Button onClick={submitLogEntries} disabled={busy}>
+              <Check className="mr-1 h-3 w-3" /> Log time
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -537,7 +774,7 @@ export function RequestDetailClient({
           <DialogHeader>
             <DialogTitle>Move to another POC</DialogTitle>
             <DialogDescription>
-              Reassign this request to a different POC. A reason is required for the tracking log.
+              Reassign this request to a different POC by primary role, then name. A reason is required for the tracking log.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -588,8 +825,67 @@ export function RequestDetailClient({
             <Button variant="outline" onClick={() => setMoveOpen(false)} disabled={busy}>
               Cancel
             </Button>
+            <Button variant="secondary" onClick={randomAssign} disabled={busy || otherPocs.length === 0} title="Randomly assign among the eligible POCs">
+              <Dices className="mr-1 h-3 w-3" /> Random
+            </Button>
             <Button onClick={confirmMove} disabled={busy || !movePoc || !moveReason.trim()}>
               <ArrowRightLeft className="mr-1 h-3 w-3" /> Move request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add co-worker dialog */}
+      <Dialog open={workerOpen} onOpenChange={setWorkerOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add a co-worker</DialogTitle>
+            <DialogDescription>
+              Add another person to work on this request alongside you. They can log their own hours (no transfer needed).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="worker-role">Primary role (SSO)</Label>
+              <Select
+                value={workerRole || undefined}
+                onValueChange={(v) => { setWorkerRole(v); setWorkerUser(""); }}
+              >
+                <SelectTrigger id="worker-role">
+                  <SelectValue placeholder="Select a primary role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {workerRoles.map((r) => (
+                    <SelectItem key={r} value={r}>{r.replace(/_/g, " ").toLowerCase()}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="worker-user">Person by name</Label>
+              <Select value={workerUser || undefined} onValueChange={setWorkerUser}>
+                <SelectTrigger id="worker-user">
+                  <SelectValue placeholder={workerRole ? "Select a person" : "Choose a primary role first"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {workerFiltered.length === 0 && (
+                    <div className="px-3 py-2 text-xs text-muted-foreground">
+                      {workerRole ? "No eligible people for this role" : "Choose a primary role first"}
+                    </div>
+                  )}
+                  {workerFiltered.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name} ({p.username})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWorkerOpen(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button onClick={addWorker} disabled={busy || !workerUser}>
+              <UserPlus className="mr-1 h-3 w-3" /> Add co-worker
             </Button>
           </DialogFooter>
         </DialogContent>

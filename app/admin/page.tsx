@@ -77,6 +77,12 @@ export default async function AdminPage() {
             <a href={apiPath("/admin/tracking")} className="block rounded-md border p-3 text-sm font-medium hover:bg-muted/40">
               Full Tracking — filter every request, user and POC workload
             </a>
+            <a href={apiPath("/admin/analytics/users")} className="block rounded-md border p-3 text-sm font-medium hover:bg-muted/40">
+              Tracking: Users — who raised what, solved counts, work time
+            </a>
+            <a href={apiPath("/admin/analytics/categories")} className="block rounded-md border p-3 text-sm font-medium hover:bg-muted/40">
+              Tracking: Categories — raised vs solved per category and sub-category
+            </a>
           </CardContent>
         </Card>
       </div>

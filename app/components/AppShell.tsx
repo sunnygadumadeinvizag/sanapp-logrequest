@@ -62,7 +62,9 @@ export async function AppShell({
     baseItems.push(
       { label: "App Admin Console", href: "/admin", heading: true, active: active === "admin" },
       { label: "Categories & POCs", href: "/admin/categories" },
-      { label: "Full Tracking", href: "/admin/tracking" }
+      { label: "Full Tracking", href: "/admin/tracking" },
+      { label: "Tracking: Users", href: "/admin/analytics/users" },
+      { label: "Tracking: Categories", href: "/admin/analytics/categories" }
     );
   }
   const items = [...baseItems, ...sidebarItems];

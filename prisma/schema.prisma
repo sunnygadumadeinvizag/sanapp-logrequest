@@ -65,6 +65,8 @@ model AppUser {
   workLogs      WorkLog[]
   notifications Notification[]
   reads         RequestCommentRead[]
+  workerRequests RequestWorker[] // requests this user is an extra worker on
+  addedWorkers   RequestWorker[] @relation("WorkerAddedBy")
 }
 
 model Category {
@@ -141,6 +143,7 @@ model Request {
   workLogs        WorkLog[]
   attachments     RequestAttachment[]
   notifications   Notification[]
+  workers         RequestWorker[]
   @@index([categoryId, status])
   @@index([assignedPocId, status])
   @@index([requestedById, createdAt])
@@ -196,7 +199,26 @@ model WorkLog {
   endedAt   DateTime?
   minutes   Int      @default(0) // 0 while running; set when the session stops
   note      String?
+  // Where the work happened and whether it was on campus. Set on manual
+  // from/to logs and on timer stop.
+  location  String?
+  inCampus  Boolean  @default(true)
   createdAt DateTime @default(now())
+}
+
+// Additional people (co-workers) added to a request by the assignee or an
+// ADMIN. They work alongside the assigned POC (instead of the request being
+// transferred) and can log their own hours against the request.
+model RequestWorker {
+  id         String   @id @default(uuid())
+  requestId  String
+  request    Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  userId     String
+  user       AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addedById  String?
+  addedBy    AppUser? @relation("WorkerAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
+  @@unique([requestId, userId])
 }
 
 model RequestAttachment {

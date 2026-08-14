@@ -51,6 +51,9 @@ export default async function RequestDetailPage({
         orderBy: { startedAt: "desc" },
         include: { poc: { select: { id: true, username: true, name: true } } },
       },
+      workers: {
+        include: { user: { select: { id: true, username: true, name: true, primaryRole: true } } },
+      },
     },
   });
 
@@ -60,7 +63,8 @@ export default async function RequestDetailPage({
     me.role === "POC" ||
     r.requestedById === me.id ||
     r.requestedForId === me.id ||
-    r.assignedPocId === me.id;
+    r.assignedPocId === me.id ||
+    r.workers.some((w) => w.userId === me.id);
   if (!canView) notFound();
 
   // POC options for "move to another POC". The assigner picks a primary
@@ -164,6 +168,8 @@ export default async function RequestDetailPage({
             minutes: w.minutes,
             running: !w.endedAt,
             note: w.note,
+            location: w.location,
+            inCampus: w.inCampus,
             startedAt: w.startedAt.toISOString(),
             endedAt: w.endedAt ? w.endedAt.toISOString() : null,
             poc: { name: w.poc.name },
@@ -177,6 +183,14 @@ export default async function RequestDetailPage({
           username: u.username,
           primaryRole: u.primaryRole ?? "",
         }))}
+        workers={r.workers.map((w) => ({
+          id: w.id,
+          userId: w.userId,
+          username: w.user.username,
+          name: w.user.name,
+          primaryRole: w.user.primaryRole ?? "",
+        }))}
+        isWorker={r.workers.some((w) => w.userId === me.id)}
       />
 
       {/* Timeline */}

@@ -34,6 +34,9 @@ async function loadVisible(id: string, meId: string, role: string) {
         orderBy: { startedAt: "desc" },
         include: { poc: { select: { id: true, username: true, name: true } } },
       },
+      workers: {
+        include: { user: { select: { id: true, username: true, name: true, primaryRole: true } } },
+      },
     },
   });
   if (!r) return null;
@@ -41,7 +44,8 @@ async function loadVisible(id: string, meId: string, role: string) {
     role === "ADMIN" ||
     r.requestedById === meId ||
     r.requestedForId === meId ||
-    r.assignedPocId === meId;
+    r.assignedPocId === meId ||
+    r.workers.some((w: any) => w.userId === meId);
   if (!canView) return null;
   return r;
 }
@@ -84,10 +88,19 @@ export async function GET(_req: NextRequest, ctx: RouteCtx) {
       id: w.id,
       minutes: w.minutes,
       note: w.note,
+      location: w.location,
+      inCampus: w.inCampus,
       running: !w.endedAt,
       startedAt: w.startedAt.toISOString(),
       endedAt: w.endedAt ? w.endedAt.toISOString() : null,
       poc: { id: w.poc.id, username: w.poc.username, name: w.poc.name },
+    })),
+    workers: r.workers.map((w: any) => ({
+      id: w.id,
+      userId: w.userId,
+      username: w.user.username,
+      name: w.user.name,
+      primaryRole: w.user.primaryRole ?? "",
     })),
   });
 }
@@ -175,24 +188,53 @@ export async function PATCH(request: NextRequest, ctx: RouteCtx) {
     }
   }
 
-  // Reassign / move to another POC (with reason).
+  // Reassign / move to another POC (with reason) or random assignment among
+  // the eligible pool. Selection is by SSO primary role — any user with a
+  // primary role can be assigned, not just platform-role POCs.
+  let randomTarget: { id: string; name: string } | null = null;
   if (body.moveToPocId && isPoc) {
     const target = await prisma.appUser.findUnique({ where: { id: body.moveToPocId } });
     if (!target) return NextResponse.json({ error: "target_poc_not_found" }, { status: 404 });
-    if (target.role !== "POC" && target.role !== "ADMIN") {
-      return NextResponse.json({ error: "target_not_poc" }, { status: 400 });
+    randomTarget = { id: target.id, name: target.name };
+  } else if (body.assignRandomly === true && isPoc) {
+    const pool = await (async () => {
+      if (me.role === "ADMIN") {
+        return prisma.appUser.findMany({
+          where: { primaryRole: { not: null } },
+          select: { id: true, name: true },
+        });
+      }
+      const assigns = await prisma.pocAssignment.findMany({
+        where: {
+          active: true,
+          OR: [
+            { subCategoryId: r.subCategoryId ?? undefined, categoryId: r.categoryId },
+            { subCategoryId: null, categoryId: r.categoryId },
+          ],
+        },
+        include: { user: { select: { id: true, name: true } } },
+      });
+      return assigns.map((a) => a.user);
+    })();
+    const eligible = pool.filter((u) => u.id !== me.id);
+    if (eligible.length === 0) {
+      return NextResponse.json({ error: "no_poc_available" }, { status: 400 });
     }
+    randomTarget = eligible[Math.floor(Math.random() * eligible.length)];
+  }
+
+  if (randomTarget) {
     const reason = String(body.moveReason ?? "").trim() || "Workload transfer";
-    data.assignedPocId = target.id;
+    data.assignedPocId = randomTarget.id;
     data.status = r.status === "CLOSED" ? r.status : "ASSIGNED";
     eventRows.push({
       userId: me.id,
       type: "MOVED",
-      message: `Moved to ${target.name} — ${reason}`,
-      toPocId: target.id,
+      message: `Moved to ${randomTarget.name} — ${reason}`,
+      toPocId: randomTarget.id,
     });
     notifyRows.push({
-      userId: target.id,
+      userId: randomTarget.id,
       kind: "MOVED",
       title: "Request moved to you",
       body: `${fmtRequestNumber(r.number)} — ${r.title}. Reason: ${reason}`,
