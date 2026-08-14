@@ -115,7 +115,7 @@ export function QueueClient({ meUsername }: { meUsername: string }) {
               const mine = w.assignedPoc?.name ?? null;
               return (
                 <div key={w.id} className="flex items-start justify-between gap-3 p-3">
-                  <a href={apiPath(`/requests/${w.id}`)} className="min-w-0 flex-1 hover:underline">
+                  <a href={apiPath(`/requests/${w.id}`)} className="min-w-0 flex-1 cursor-pointer">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs font-semibold text-primary">{w.requestId}</span>
                       {w.category && <Badge variant="outline">{w.category.name}</Badge>}

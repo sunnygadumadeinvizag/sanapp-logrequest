@@ -85,7 +85,7 @@ export function NotificationsClient() {
               <div key={n.id} className={`flex items-start justify-between gap-3 p-3 ${n.read ? "" : "bg-primary/5"}`}>
                 <a
                   href={n.requestId ? apiPath(`/requests/${n.requestId}`) : undefined}
-                  className={`min-w-0 flex-1 ${n.requestId ? "hover:underline" : ""}`}
+                  className={`min-w-0 flex-1 ${n.requestId ? "cursor-pointer" : ""}`}
                   onClick={n.requestId ? undefined : (e) => e.preventDefault()}
                 >
                   <div className="flex items-center gap-2">

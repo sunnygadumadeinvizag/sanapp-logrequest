@@ -104,7 +104,7 @@ export default async function MyWorkPage() {
           {workLogs.length === 0 && <p className="p-6 text-sm text-muted-foreground">No work sessions yet.</p>}
           {workLogs.map((w) => (
             <div key={w.id} className="flex items-center justify-between gap-3 p-3 text-sm">
-              <a href={apiPath(`/requests/${w.requestId}`)} className="min-w-0 truncate hover:underline">
+              <a href={apiPath(`/requests/${w.requestId}`)} className="min-w-0 cursor-pointer truncate">
                 <span className="font-medium">{fmtRequestNumber(w.request.number)}</span> — {w.request.title}
                 {w.note && <span className="text-muted-foreground"> · {w.note}</span>}
               </a>
