@@ -59,7 +59,8 @@ export async function fetchUserInfo(accessToken: string): Promise<{
 export async function verifyIdToken(idToken: string) {
   const { payload } = await jwtVerify(idToken, JWKS, {
     audience: CLIENT_ID,
-    issuer: `${SSO_BASE_URL}/api/oidc`,
+    issuer: SSO_BASE_URL,
+    algorithms: ['RS256'],
   });
   return payload;
 }
