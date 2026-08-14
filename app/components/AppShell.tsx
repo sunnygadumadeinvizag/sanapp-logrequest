@@ -3,6 +3,7 @@ import {
   AppsMenu,
   apiPath,
   getPlatformNav,
+  lookupAppName,
   Notifications,
   PageShell,
   SessionGuard,
@@ -29,6 +30,14 @@ export async function AppShell({
   sidebarItems: SidebarItem[];
   children: ReactNode;
 }) {
+  // The registry name for this deployment (one project can host several apps):
+  // resolved from iipe-main by base path, falling back to the project name.
+  const appName = await lookupAppName({
+    mainBaseUrl: MAIN_BASE_URL,
+    appKey: process.env.MAIN_API_KEY,
+    basePath: process.env.BASE_PATH ?? "/logrequest",
+    fallback: "Log Request",
+  });
   const local = await prisma.appUser.findUnique({ where: { username: me.username } });
   const userId = local?.id ?? "";
   const unreadCount = userId ? await prisma.notification.count({ where: { userId, read: false } }) : 0;
@@ -71,6 +80,7 @@ export async function AppShell({
 
   return (
     <PageShell
+      appName={appName}
       header={{
         navItems: getPlatformNav({
           mainBaseUrl: MAIN_BASE_URL,
