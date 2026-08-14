@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiPath } from "iipe-common-ui";
+import { apiPath } from "sanapp-common-ui";
 import { STATUS_LABELS, fmtMinutes, fmtRequestNumber } from "@/lib/labels";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";

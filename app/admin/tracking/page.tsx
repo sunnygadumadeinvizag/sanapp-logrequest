@@ -1,7 +1,7 @@
 import { currentUser } from "@/lib/auth";
 import { AppShell } from "@app/components/AppShell";
 import { AdminTrackingClient } from "@app/components/AdminTrackingClient";
-import { Breadcrumb } from "iipe-common-ui";
+import { Breadcrumb } from "sanapp-common-ui";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";

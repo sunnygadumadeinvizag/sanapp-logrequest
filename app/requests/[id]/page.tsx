@@ -3,7 +3,7 @@ import { currentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AppShell } from "@app/components/AppShell";
 import { RequestDetailClient } from "@app/components/RequestDetailClient";
-import { Breadcrumb } from "iipe-common-ui";
+import { Breadcrumb } from "sanapp-common-ui";
 import { fmtIstDateTime } from "@/lib/labels";
 import { Badge } from "@/components/ui/badge";
 

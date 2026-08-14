@@ -1,10 +1,10 @@
-# IIPE Log Request (iipe-app5)
+# IIPE Log Request (sanapp-logrequest)
 
 Independent application #5 of the IIPE intranet — a ServiceNow-style request
 tracking app with its **own database** (`app5_db`) and **own roles**.
 
-- **SSO** (iipe-sso) answers *who are you?*
-- **Main** (iipe-main) answers *can you access this app?*
+- **SSO** (sanapp-sso) answers *who are you?*
+- **Main** (sanapp-main) answers *can you access this app?*
 - **Log Request** answers *what can you do with this request?*
 
 ## Features

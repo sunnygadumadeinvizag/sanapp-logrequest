@@ -1,7 +1,7 @@
 import { currentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AppShell } from "@app/components/AppShell";
-import { Breadcrumb } from "iipe-common-ui";
+import { Breadcrumb } from "sanapp-common-ui";
 import { notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 

@@ -2,7 +2,7 @@ import { currentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AppShell } from "@app/components/AppShell";
 import { RequestsClient } from "@app/components/RequestsClient";
-import { apiPath } from "iipe-common-ui";
+import { apiPath } from "sanapp-common-ui";
 import { Suspense } from "react";
 
 export const dynamic = "force-dynamic";

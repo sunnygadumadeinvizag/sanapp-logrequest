@@ -2,7 +2,7 @@ import { currentUser, listSsoUsers } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AppShell } from "@app/components/AppShell";
 import { AdminCategoriesClient } from "@app/components/AdminCategoriesClient";
-import { Breadcrumb } from "iipe-common-ui";
+import { Breadcrumb } from "sanapp-common-ui";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
