@@ -100,7 +100,7 @@ export function RequestDetailClient({
   const { request } = data;
   const isPoc = role === "POC" || role === "ADMIN";
   const isAssignee = request.assignedPoc?.username === me.username;
-  const canWork = isPoc || isWorker;
+  const canLogTime = isAssignee || isWorker;
 
   const [comments, setComments] = useState(data.comments);
   const [commentText, setCommentText] = useState("");
@@ -431,12 +431,13 @@ export function RequestDetailClient({
         </span>
       </div>
 
-      {canWork && (
+      {(canLogTime || isPoc) && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm">POC actions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {canLogTime && (
             <div className="flex flex-wrap items-center gap-2">
               {running ? (
                 <>
@@ -478,6 +479,7 @@ export function RequestDetailClient({
                 {inCampus ? "In campus" : "Outside campus"}
               </label>
             </div>
+            )}
 
             <div className="flex flex-wrap items-center gap-2">
               {request.status === "ASSIGNED" && isAssignee && (

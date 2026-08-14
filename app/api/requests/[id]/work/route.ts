@@ -37,13 +37,15 @@ export async function POST(request: NextRequest, ctx: RouteCtx) {
   const r = await prisma.request.findUnique({ where: { id } });
   if (!r) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-  const isPoc = me.role === "POC" || me.role === "ADMIN";
   const isAssignee = r.assignedPocId === me.id;
   const worker = await prisma.requestWorker.findUnique({
     where: { requestId_userId: { requestId: id, userId: me.id } },
   });
   const isWorker = !!worker;
-  if (!isPoc || (!isAssignee && !isWorker && me.role !== "ADMIN")) {
+  // Only the assigned POC and added co-workers may log time against a
+  // request. Admins manage (assign/move/close) but don't clock hours on
+  // requests they are not working on.
+  if (!isAssignee && !isWorker) {
     return NextResponse.json({ error: "only_assignee_or_worker_can_work" }, { status: 403 });
   }
 
