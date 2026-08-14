@@ -38,6 +38,7 @@ type Cat = {
     id: string;
     name: string;
     description: string | null;
+    active: boolean;
     requireLocation: boolean;
     requireContactTime: boolean;
     requireContactPhone: boolean;
@@ -124,6 +125,7 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
         ...(cat?.subCategories ?? []).map((s) => ({
           name: s.name,
           description: s.description,
+          active: s.active,
           requireLocation: s.requireLocation,
           requireContactTime: s.requireContactTime,
           requireContactPhone: s.requireContactPhone,
@@ -207,6 +209,7 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
       subCategories: nextSubs.map((s) => ({
         name: s.name,
         description: s.description,
+        active: s.active,
         requireLocation: s.requireLocation,
         requireContactTime: s.requireContactTime,
         requireContactPhone: s.requireContactPhone,
@@ -222,6 +225,34 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
     const next = has ? cat.allowedRoles.filter((r) => r !== role) : [...cat.allowedRoles, role];
     save(catId, { allowedRoles: next });
     setCats((cs) => cs.map((c) => (c.id === catId ? { ...c, allowedRoles: next } : c)));
+  }
+
+  // Accepting-requests toggles (category-level and per sub-category).
+  function toggleActive(catId: string) {
+    const cat = cats.find((c) => c.id === catId);
+    if (!cat) return;
+    const next = !cat.active;
+    save(catId, { active: next });
+    setCats((cs) => cs.map((c) => (c.id === catId ? { ...c, active: next } : c)));
+  }
+
+  function toggleSubActive(catId: string, subId: string) {
+    const cat = cats.find((c) => c.id === catId);
+    if (!cat) return;
+    const nextSubs = cat.subCategories.map((s) =>
+      s.id === subId ? { ...s, active: !s.active } : s
+    );
+    save(catId, {
+      subCategories: nextSubs.map((s) => ({
+        name: s.name,
+        description: s.description,
+        active: s.active,
+        requireLocation: s.requireLocation,
+        requireContactTime: s.requireContactTime,
+        requireContactPhone: s.requireContactPhone,
+      })),
+    });
+    setCats((cs) => cs.map((c) => (c.id === catId ? { ...c, subCategories: nextSubs } : c)));
   }
 
   const assignableUsers = pocRole
@@ -244,13 +275,33 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
         {cats.map((c) => {
           const open = expanded[c.id];
           return (
-            <div key={c.id} className="rounded-lg border bg-card">
-              <div className="flex items-center justify-between p-3">
-                <div>
-                  <p className="font-semibold">{c.name}</p>
+            <div key={c.id} className={`rounded-lg border bg-card ${c.active ? "" : "opacity-80"}`}>
+              <div className="flex items-center justify-between gap-2 p-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-semibold">{c.name}</p>
+                    {c.active ? (
+                      <span className="rounded-full border border-green-300 bg-green-50 px-2 py-0.5 text-[10px] font-medium text-green-700">
+                        Accepting requests
+                      </span>
+                    ) : (
+                      <span className="rounded-full border border-red-300 bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-700">
+                        Not accepting requests
+                      </span>
+                    )}
+                  </div>
                   {c.description && <p className="text-xs text-muted-foreground">{c.description}</p>}
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button
+                    variant={c.active ? "outline" : "default"}
+                    size="sm"
+                    onClick={() => toggleActive(c.id)}
+                    disabled={busy}
+                    title={c.active ? "Stop accepting new requests for this category" : "Accept new requests for this category again"}
+                  >
+                    {c.active ? "Stop accepting" : "Accept requests"}
+                  </Button>
                   <Button variant="ghost" size="sm" onClick={() => setExpanded((e) => ({ ...e, [c.id]: !e[c.id] }))}>
                     {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   </Button>
@@ -328,12 +379,31 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
                     <p className="mb-1 text-xs font-semibold text-muted-foreground">Sub-categories</p>
                     <div className="space-y-1">
                       {c.subCategories.map((s) => (
-                        <div key={s.id} className="rounded-md border px-2 py-1 text-sm">
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">{s.name}</span>
-                            <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]" onClick={() => openAssignPoc(c.id, s.id)} disabled={busy}>
-                              <Plus className="mr-1 h-3 w-3" /> POC
-                            </Button>
+                        <div key={s.id} className={`rounded-md border px-2 py-1 text-sm ${s.active ? "" : "opacity-75"}`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="flex min-w-0 flex-wrap items-center gap-1.5 font-medium">
+                              {s.name}
+                              {s.active ? (
+                                <span className="rounded-full border border-green-300 bg-green-50 px-1.5 py-px text-[10px] font-medium text-green-700">On</span>
+                              ) : (
+                                <span className="rounded-full border border-red-300 bg-red-50 px-1.5 py-px text-[10px] font-medium text-red-700">Off</span>
+                              )}
+                            </span>
+                            <span className="flex shrink-0 items-center gap-1">
+                              <Button
+                                variant={s.active ? "ghost" : "outline"}
+                                size="sm"
+                                className="h-6 px-2 text-[11px]"
+                                onClick={() => toggleSubActive(c.id, s.id)}
+                                disabled={busy}
+                                title={s.active ? "Stop accepting requests for this sub-category" : "Accept requests for this sub-category again"}
+                              >
+                                {s.active ? "Stop" : "Accept"}
+                              </Button>
+                              <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]" onClick={() => openAssignPoc(c.id, s.id)} disabled={busy}>
+                                <Plus className="mr-1 h-3 w-3" /> POC
+                              </Button>
+                            </span>
                           </div>
                           <div className="mt-1 flex flex-wrap gap-1">
                             {FIELD_LABELS.map((f) => {

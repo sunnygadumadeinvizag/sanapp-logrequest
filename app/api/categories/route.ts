@@ -10,12 +10,13 @@ export async function GET() {
   const me = await sessionUser();
   if (!me) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
+  const isAdmin = me.role === "ADMIN";
   const categories = await prisma.category.findMany({
-    where: { active: true },
+    where: isAdmin ? {} : { active: true },
     orderBy: [{ order: "asc" }, { name: "asc" }],
     include: {
       subCategories: {
-        where: { active: true },
+        where: isAdmin ? {} : { active: true },
         orderBy: [{ order: "asc" }, { name: "asc" }],
         include: {
           pocs: {
@@ -39,6 +40,7 @@ export async function GET() {
       name: c.name,
       description: c.description,
       allowedRoles: c.allowedRoles,
+      active: c.active,
       requireLocation: c.requireLocation,
       requireContactTime: c.requireContactTime,
       requireContactPhone: c.requireContactPhone,
@@ -52,6 +54,7 @@ export async function GET() {
         id: s.id,
         name: s.name,
         description: s.description,
+        active: s.active,
         requireLocation: s.requireLocation,
         requireContactTime: s.requireContactTime,
         requireContactPhone: s.requireContactPhone,

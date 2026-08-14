@@ -12,11 +12,9 @@ export default async function AdminCategoriesPage() {
   if (!me || me.role !== "ADMIN") notFound();
 
   const categories = await prisma.category.findMany({
-    where: { active: true },
     orderBy: [{ order: "asc" }, { name: "asc" }],
     include: {
       subCategories: {
-        where: { active: true },
         orderBy: { order: "asc" },
         include: {
           pocs: {
@@ -74,6 +72,7 @@ export default async function AdminCategoriesPage() {
               id: s.id,
               name: s.name,
               description: s.description,
+              active: s.active,
               requireLocation: s.requireLocation,
               requireContactTime: s.requireContactTime,
               requireContactPhone: s.requireContactPhone,
