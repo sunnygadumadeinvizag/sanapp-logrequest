@@ -2,6 +2,7 @@ import { currentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AppShell } from "@app/components/AppShell";
 import { RequestsClient } from "@app/components/RequestsClient";
+import { apiPath } from "iipe-common-ui";
 import { Suspense } from "react";
 
 export const dynamic = "force-dynamic";
@@ -37,8 +38,8 @@ export default async function RequestsPage() {
       {isPoc && (
         <p className="mt-4 text-xs text-muted-foreground">
           As a POC you can also see the{" "}
-          <a href="/queue" className="text-primary hover:underline">POC queue</a> and your{" "}
-          <a href="/my-work" className="text-primary hover:underline">work history</a>.
+          <a href={apiPath("/queue")} className="text-primary hover:underline">POC queue</a> and your{" "}
+          <a href={apiPath("/my-work")} className="text-primary hover:underline">work history</a>.
         </p>
       )}
     </AppShell>

@@ -1,6 +1,7 @@
 import { currentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AppShell } from "@app/components/AppShell";
+import { apiPath } from "iipe-common-ui";
 import { STATUS_LABELS, fmtMinutes } from "@/lib/labels";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { notFound } from "next/navigation";
@@ -36,7 +37,7 @@ export default async function AdminPage() {
 
   return (
     <AppShell me={session} active="admin" sidebarItems={[]}>
-      <h1 className="iipe-page-title">Admin Console</h1>
+      <h1 className="iipe-page-title">App Admin Console</h1>
       <p className="iipe-page-sub">Complete tracking of everything — categories, POCs, users and requests.</p>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -61,7 +62,7 @@ export default async function AdminPage() {
             ].map(([k, v]) => (
               <div key={k as string} className="flex items-center justify-between text-sm">
                 <span>{STATUS_LABELS[k as string] ?? k}</span>
-                <a href={`/admin/tracking?status=${k}`} className="font-semibold text-primary hover:underline">{v}</a>
+                <a href={apiPath(`/admin/tracking?status=${k}`)} className="font-semibold text-primary hover:underline">{v}</a>
               </div>
             ))}
           </CardContent>
@@ -70,10 +71,10 @@ export default async function AdminPage() {
         <Card>
           <CardHeader><CardTitle className="text-sm">Management</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            <a href="/admin/categories" className="block rounded-md border p-3 text-sm font-medium hover:bg-muted/40">
+            <a href={apiPath("/admin/categories")} className="block rounded-md border p-3 text-sm font-medium hover:bg-muted/40">
               Categories &amp; POCs — who may raise requests, POC queue order
             </a>
-            <a href="/admin/tracking" className="block rounded-md border p-3 text-sm font-medium hover:bg-muted/40">
+            <a href={apiPath("/admin/tracking")} className="block rounded-md border p-3 text-sm font-medium hover:bg-muted/40">
               Full Tracking — filter every request, user and POC workload
             </a>
           </CardContent>

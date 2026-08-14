@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AppShell } from "@app/components/AppShell";
+import { apiPath } from "iipe-common-ui";
 import { fmtRequestNumber, statusLabel, priorityLabel, fmtMinutes } from "@/lib/labels";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -85,7 +86,7 @@ export default async function DashboardPage() {
       {running && (
         <div className="mt-4 rounded-md border border-primary/40 bg-primary/10 px-4 py-3 text-sm">
           <strong>You are currently working on</strong>{" "}
-          <a href={`/requests/${running.request.id}`} className="font-semibold underline">
+          <a href={apiPath(`/requests/${running.request.id}`)} className="font-semibold underline">
             {fmtRequestNumber(running.request.number)} — {running.request.title}
           </a>{" "}
           — remember to stop the timer when done.
@@ -102,7 +103,7 @@ export default async function DashboardPage() {
             {recent.map((r) => (
               <a
                 key={r.id}
-                href={`/requests/${r.id}`}
+                href={apiPath(`/requests/${r.id}`)}
                 className="flex items-start justify-between gap-3 rounded-md border p-3 transition-colors hover:bg-muted/40"
               >
                 <div className="min-w-0">
@@ -138,7 +139,7 @@ export default async function DashboardPage() {
                     <p className="text-sm font-medium">{c.name}</p>
                   </div>
                   {eligible ? (
-                    <a href={`/requests/new?category=${c.id}`} className="text-xs font-semibold text-primary hover:underline">
+                    <a href={apiPath(`/requests/new?category=${c.id}`)} className="text-xs font-semibold text-primary hover:underline">
                       Raise request →
                     </a>
                   ) : (
@@ -157,7 +158,7 @@ export default async function DashboardPage() {
 function StatCard({ label, value, href, accent = false }: { label: string; value: number; href: string; accent?: boolean }) {
   return (
     <a
-      href={href}
+      href={apiPath(href)}
       className={`rounded-lg border p-4 transition-colors ${accent ? "border-primary/50 bg-primary/5" : "bg-card hover:bg-muted/40"}`}
     >
       <p className="text-xs text-muted-foreground">{label}</p>

@@ -26,7 +26,7 @@ export default async function AdminTrackingPage() {
       <div className="mb-3">
         <Breadcrumb
           items={[
-            { label: "Admin Console", href: "/admin" },
+            { label: "App Admin Console", href: "/admin" },
             { label: "Full Tracking" },
           ]}
         />

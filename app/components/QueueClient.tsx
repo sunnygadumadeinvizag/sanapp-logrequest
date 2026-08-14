@@ -83,7 +83,7 @@ export function QueueClient({ meUsername }: { meUsername: string }) {
         <div className="flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-sm">
           <Clock className="h-4 w-4 animate-pulse text-primary" />
           You are working on{" "}
-          <a href={`/requests/${running.requestId}`} className="font-semibold text-primary hover:underline">
+          <a href={apiPath(`/requests/${running.requestId}`)} className="font-semibold text-primary hover:underline">
             REQ-{String(running.number).padStart(4, "0")} — {running.title}
           </a>
         </div>
@@ -115,7 +115,7 @@ export function QueueClient({ meUsername }: { meUsername: string }) {
               const mine = w.assignedPoc?.name ?? null;
               return (
                 <div key={w.id} className="flex items-start justify-between gap-3 p-3">
-                  <a href={`/requests/${w.id}`} className="min-w-0 flex-1 hover:underline">
+                  <a href={apiPath(`/requests/${w.id}`)} className="min-w-0 flex-1 hover:underline">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs font-semibold text-primary">{w.requestId}</span>
                       {w.category && <Badge variant="outline">{w.category.name}</Badge>}

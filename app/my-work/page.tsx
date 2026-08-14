@@ -1,6 +1,7 @@
 import { currentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AppShell } from "@app/components/AppShell";
+import { apiPath } from "iipe-common-ui";
 import { fmtMinutes, fmtIstDateTime, fmtRequestNumber, statusLabel } from "@/lib/labels";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -84,7 +85,7 @@ export default async function MyWorkPage() {
         <div className="divide-y">
           {perRequest.size === 0 && <p className="p-6 text-sm text-muted-foreground">No work logged yet.</p>}
           {[...perRequest.entries()].map(([reqId, v]) => (
-            <a key={reqId} href={`/requests/${reqId}`} className="flex items-center justify-between p-3 hover:bg-muted/40">
+            <a key={reqId} href={apiPath(`/requests/${reqId}`)} className="flex items-center justify-between p-3 hover:bg-muted/40">
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{fmtRequestNumber(v.number)} — {v.title}</p>
                 <p className="text-xs text-muted-foreground">{v.sessions} session{v.sessions === 1 ? "" : "s"}</p>
@@ -103,7 +104,7 @@ export default async function MyWorkPage() {
           {workLogs.length === 0 && <p className="p-6 text-sm text-muted-foreground">No work sessions yet.</p>}
           {workLogs.map((w) => (
             <div key={w.id} className="flex items-center justify-between gap-3 p-3 text-sm">
-              <a href={`/requests/${w.requestId}`} className="min-w-0 truncate hover:underline">
+              <a href={apiPath(`/requests/${w.requestId}`)} className="min-w-0 truncate hover:underline">
                 <span className="font-medium">{fmtRequestNumber(w.request.number)}</span> — {w.request.title}
                 {w.note && <span className="text-muted-foreground"> · {w.note}</span>}
               </a>

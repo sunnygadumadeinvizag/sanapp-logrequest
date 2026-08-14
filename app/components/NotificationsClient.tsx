@@ -84,7 +84,7 @@ export function NotificationsClient() {
             {rows.map((n) => (
               <div key={n.id} className={`flex items-start justify-between gap-3 p-3 ${n.read ? "" : "bg-primary/5"}`}>
                 <a
-                  href={n.requestId ? `/requests/${n.requestId}` : undefined}
+                  href={n.requestId ? apiPath(`/requests/${n.requestId}`) : undefined}
                   className={`min-w-0 flex-1 ${n.requestId ? "hover:underline" : ""}`}
                   onClick={n.requestId ? undefined : (e) => e.preventDefault()}
                 >

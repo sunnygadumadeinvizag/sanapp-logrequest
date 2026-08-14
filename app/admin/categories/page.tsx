@@ -49,7 +49,7 @@ export default async function AdminCategoriesPage() {
       <div className="mb-3">
         <Breadcrumb
           items={[
-            { label: "Admin Console", href: "/admin" },
+            { label: "App Admin Console", href: "/admin" },
             { label: "Categories & POCs" },
           ]}
         />

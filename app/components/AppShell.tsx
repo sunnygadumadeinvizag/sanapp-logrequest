@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import {
   AppsMenu,
+  apiPath,
   getPlatformNav,
   Notifications,
   PageShell,
@@ -59,7 +60,7 @@ export async function AppShell({
   });
   if (local?.role === "ADMIN") {
     baseItems.push(
-      { label: "Admin Console", href: "/admin", heading: true, active: active === "admin" },
+      { label: "App Admin Console", href: "/admin", heading: true, active: active === "admin" },
       { label: "Categories & POCs", href: "/admin/categories" },
       { label: "Full Tracking", href: "/admin/tracking" }
     );
@@ -83,7 +84,7 @@ export async function AppShell({
                 id: n.id,
                 title: n.title,
                 time: n.createdAt.toISOString(),
-                href: n.requestId ? `/requests/${n.requestId}` : "/notifications",
+                href: n.requestId ? apiPath(`/requests/${n.requestId}`) : apiPath("/notifications"),
               }))}
             />
             <UserMenu
