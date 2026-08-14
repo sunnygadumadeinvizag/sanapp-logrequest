@@ -138,6 +138,29 @@ export default async function RequestDetailPage({
         )}
       </div>
 
+      {(r.location || r.contactTime || r.contactPhone) && (
+        <div className="mb-4 grid gap-3 sm:grid-cols-3">
+          {r.location && (
+            <div className="rounded-lg border bg-card p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Location</p>
+              <p className="mt-0.5 text-sm">{r.location}</p>
+            </div>
+          )}
+          {r.contactTime && (
+            <div className="rounded-lg border bg-card p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Available to contact</p>
+              <p className="mt-0.5 text-sm">{r.contactTime}</p>
+            </div>
+          )}
+          {r.contactPhone && (
+            <div className="rounded-lg border bg-card p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Phone</p>
+              <p className="mt-0.5 text-sm">{r.contactPhone}</p>
+            </div>
+          )}
+        </div>
+      )}
+
       <RequestDetailClient
         data={{
           request: {

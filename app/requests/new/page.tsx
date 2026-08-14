@@ -49,7 +49,16 @@ export default async function NewRequestPage({
               me?.role === "POC" ||
               c.allowedRoles.length === 0 ||
               (me?.primaryRole ? c.allowedRoles.includes(me.primaryRole) : false),
-            subCategories: c.subCategories.map((s) => ({ id: s.id, name: s.name })),
+            requireLocation: c.requireLocation,
+            requireContactTime: c.requireContactTime,
+            requireContactPhone: c.requireContactPhone,
+            subCategories: c.subCategories.map((s) => ({
+              id: s.id,
+              name: s.name,
+              requireLocation: s.requireLocation,
+              requireContactTime: s.requireContactTime,
+              requireContactPhone: s.requireContactPhone,
+            })),
           }))}
           me={{
             username: me?.username ?? "",

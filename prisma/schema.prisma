@@ -76,6 +76,11 @@ model Category {
   // Which SSO primary roles may raise requests in this category.
   // Empty = everyone. App-admin decides per category.
   allowedRoles String[] @default([])
+  // Fields the requester must supply when raising a request in this
+  // category. App-admin toggles per category; sub-categories can override.
+  requireLocation     Boolean @default(false)
+  requireContactTime  Boolean @default(false)
+  requireContactPhone Boolean @default(false)
   active       Boolean  @default(true)
   order        Int      @default(0)
   createdAt    DateTime @default(now())
@@ -91,6 +96,10 @@ model SubCategory {
   category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   name        String
   description String?
+  // Override the category's required fields for this sub-category.
+  requireLocation     Boolean @default(false)
+  requireContactTime  Boolean @default(false)
+  requireContactPhone Boolean @default(false)
   active      Boolean  @default(true)
   order       Int      @default(0)
   pocs        PocAssignment[]
@@ -124,6 +133,10 @@ model Request {
   subCategory     SubCategory?    @relation(fields: [subCategoryId], references: [id], onDelete: SetNull)
   title           String
   description     String
+  // Contact details supplied by the requester so the POC can reach them.
+  location        String?
+  contactTime     String? // preferred time window to contact
+  contactPhone    String? // phone number for more information
   // Who raised it, and who it is for (on-behalf requests created by POCs).
   requestedById   String
   requestedBy     AppUser         @relation("Requester", fields: [requestedById], references: [id], onDelete: Cascade)

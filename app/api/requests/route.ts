@@ -103,6 +103,9 @@ export async function POST(request: NextRequest) {
   const description = String(body.description ?? "").trim();
   const categoryId = String(body.categoryId ?? "");
   const subCategoryId = body.subCategoryId ? String(body.subCategoryId) : null;
+  const location = typeof body.location === "string" ? body.location.trim() || null : null;
+  const contactTime = typeof body.contactTime === "string" ? body.contactTime.trim() || null : null;
+  const contactPhone = typeof body.contactPhone === "string" ? body.contactPhone.trim() || null : null;
   const priority = ["LOW", "MEDIUM", "HIGH", "URGENT"].includes(body.priority)
     ? body.priority
     : "MEDIUM";
@@ -124,12 +127,22 @@ export async function POST(request: NextRequest) {
 
   const category = await prisma.category.findUnique({ where: { id: categoryId, active: true } });
   if (!category) return NextResponse.json({ error: "category_not_found" }, { status: 404 });
+  let sub: any = null;
   if (subCategoryId) {
-    const sub = await prisma.subCategory.findFirst({
+    sub = await prisma.subCategory.findFirst({
       where: { id: subCategoryId, categoryId, active: true },
     });
     if (!sub) return NextResponse.json({ error: "subcategory_not_found" }, { status: 404 });
   }
+
+  // Required contact fields — the app-admin decides per category, and a
+  // selected sub-category can override the category's requirements.
+  const needLocation = sub ? sub.requireLocation : category.requireLocation;
+  const needContactTime = sub ? sub.requireContactTime : category.requireContactTime;
+  const needContactPhone = sub ? sub.requireContactPhone : category.requireContactPhone;
+  if (needLocation && !location) return NextResponse.json({ error: "location_required" }, { status: 400 });
+  if (needContactTime && !contactTime) return NextResponse.json({ error: "contact_time_required" }, { status: 400 });
+  if (needContactPhone && !contactPhone) return NextResponse.json({ error: "contact_phone_required" }, { status: 400 });
 
   // Category eligibility: which primary roles may raise requests here.
   const eligible =
@@ -153,6 +166,9 @@ export async function POST(request: NextRequest) {
           subCategoryId,
           title,
           description,
+          location,
+          contactTime,
+          contactPhone,
           priority,
           requestedById: me.id,
           requestedForId: requestedFor.id,

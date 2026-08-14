@@ -33,6 +33,9 @@ export async function PATCH(request: NextRequest, ctx: RouteCtx) {
     data.allowedRoles = body.allowedRoles.filter((r: string) => ALL_ROLES.includes(r));
   }
   if (typeof body.active === "boolean") data.active = body.active;
+  if (typeof body.requireLocation === "boolean") data.requireLocation = body.requireLocation;
+  if (typeof body.requireContactTime === "boolean") data.requireContactTime = body.requireContactTime;
+  if (typeof body.requireContactPhone === "boolean") data.requireContactPhone = body.requireContactPhone;
 
   const updated = await prisma.category.update({ where: { id }, data });
 
@@ -47,12 +50,18 @@ export async function PATCH(request: NextRequest, ctx: RouteCtx) {
         update: {
           description: typeof s.description === "string" ? s.description.trim() || null : undefined,
           active: typeof s.active === "boolean" ? s.active : true,
+          requireLocation: typeof s.requireLocation === "boolean" ? s.requireLocation : undefined,
+          requireContactTime: typeof s.requireContactTime === "boolean" ? s.requireContactTime : undefined,
+          requireContactPhone: typeof s.requireContactPhone === "boolean" ? s.requireContactPhone : undefined,
         },
         create: {
           categoryId: id,
           name: sname,
           description: typeof s.description === "string" ? s.description.trim() || null : null,
           active: typeof s.active === "boolean" ? s.active : true,
+          requireLocation: typeof s.requireLocation === "boolean" ? s.requireLocation : false,
+          requireContactTime: typeof s.requireContactTime === "boolean" ? s.requireContactTime : false,
+          requireContactPhone: typeof s.requireContactPhone === "boolean" ? s.requireContactPhone : false,
           order: (await prisma.subCategory.count({ where: { categoryId: id } })) + 1,
         },
       });

@@ -39,6 +39,9 @@ export async function GET() {
       name: c.name,
       description: c.description,
       allowedRoles: c.allowedRoles,
+      requireLocation: c.requireLocation,
+      requireContactTime: c.requireContactTime,
+      requireContactPhone: c.requireContactPhone,
       eligible:
         me.role === "ADMIN" ||
         me.role === "POC" ||
@@ -49,6 +52,9 @@ export async function GET() {
         id: s.id,
         name: s.name,
         description: s.description,
+        requireLocation: s.requireLocation,
+        requireContactTime: s.requireContactTime,
+        requireContactPhone: s.requireContactPhone,
         pocs: s.pocs.map((p) => ({ id: p.id, name: p.user.name, username: p.user.username })),
       })),
     })),
@@ -76,6 +82,9 @@ export async function POST(request: NextRequest) {
       name,
       description: body.description ? String(body.description).trim() : null,
       allowedRoles,
+      requireLocation: typeof body.requireLocation === "boolean" ? body.requireLocation : false,
+      requireContactTime: typeof body.requireContactTime === "boolean" ? body.requireContactTime : false,
+      requireContactPhone: typeof body.requireContactPhone === "boolean" ? body.requireContactPhone : false,
       order: (await prisma.category.count()) + 1,
     },
   });

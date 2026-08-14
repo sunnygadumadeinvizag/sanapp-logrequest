@@ -31,7 +31,18 @@ type Cat = {
   description: string | null;
   allowedRoles: string[];
   active: boolean;
-  subCategories: { id: string; name: string; description: string | null; pocs: { id: string; name: string }[] }[];
+  requireLocation: boolean;
+  requireContactTime: boolean;
+  requireContactPhone: boolean;
+  subCategories: {
+    id: string;
+    name: string;
+    description: string | null;
+    requireLocation: boolean;
+    requireContactTime: boolean;
+    requireContactPhone: boolean;
+    pocs: { id: string; name: string }[];
+  }[];
   pocs: { id: string; name: string; username: string }[];
 };
 
@@ -108,7 +119,18 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
     const name = prompt("New sub-category name:");
     if (!name?.trim()) return;
     const cat = cats.find((c) => c.id === catId);
-    await save(catId, { subCategories: [...(cat?.subCategories ?? []).map((s) => ({ name: s.name, description: s.description })), { name }] });
+    await save(catId, {
+      subCategories: [
+        ...(cat?.subCategories ?? []).map((s) => ({
+          name: s.name,
+          description: s.description,
+          requireLocation: s.requireLocation,
+          requireContactTime: s.requireContactTime,
+          requireContactPhone: s.requireContactPhone,
+        })),
+        { name },
+      ],
+    });
     const r = await fetch(apiPath("/api/categories"), { cache: "no-store" });
     setCats((await r.json()).categories);
   }
@@ -159,6 +181,38 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
     } finally {
       setBusy(false);
     }
+  }
+
+  const FIELD_LABELS: { key: "requireLocation" | "requireContactTime" | "requireContactPhone"; label: string }[] = [
+    { key: "requireLocation", label: "Location" },
+    { key: "requireContactTime", label: "Available to contact" },
+    { key: "requireContactPhone", label: "Phone number" },
+  ];
+
+  function toggleRequire(catId: string, key: "requireLocation" | "requireContactTime" | "requireContactPhone") {
+    const cat = cats.find((c) => c.id === catId);
+    if (!cat) return;
+    const next = !cat[key];
+    save(catId, { [key]: next });
+    setCats((cs) => cs.map((c) => (c.id === catId ? { ...c, [key]: next } : c)));
+  }
+
+  function toggleSubRequire(catId: string, subId: string, key: "requireLocation" | "requireContactTime" | "requireContactPhone") {
+    const cat = cats.find((c) => c.id === catId);
+    if (!cat) return;
+    const nextSubs = cat.subCategories.map((s) =>
+      s.id === subId ? { ...s, [key]: !s[key] } : s
+    );
+    save(catId, {
+      subCategories: nextSubs.map((s) => ({
+        name: s.name,
+        description: s.description,
+        requireLocation: s.requireLocation,
+        requireContactTime: s.requireContactTime,
+        requireContactPhone: s.requireContactPhone,
+      })),
+    });
+    setCats((cs) => cs.map((c) => (c.id === catId ? { ...c, subCategories: nextSubs } : c)));
   }
 
   function toggleRole(catId: string, role: string) {
@@ -227,6 +281,30 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
                     </div>
                   </div>
 
+                  {/* Required fields when raising a request */}
+                  <div>
+                    <p className="mb-1 text-xs font-semibold text-muted-foreground">Required when raising a request</p>
+                    <div className="flex flex-wrap gap-2">
+                      {FIELD_LABELS.map((f) => {
+                        const on = c[f.key];
+                        return (
+                          <button
+                            key={f.key}
+                            type="button"
+                            onClick={() => toggleRequire(c.id, f.key)}
+                            disabled={busy}
+                            className={`rounded-full border px-2 py-0.5 text-xs ${on ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground"}`}
+                          >
+                            {on ? "✓ " : ""}{f.label}
+                          </button>
+                        );
+                      })}
+                      <span className="ml-1 self-center text-[10px] text-muted-foreground">
+                        {c.requireLocation || c.requireContactTime || c.requireContactPhone ? "" : "(nothing required)"}
+                      </span>
+                    </div>
+                  </div>
+
                   {/* Category POCs */}
                   <div>
                     <p className="mb-1 text-xs font-semibold text-muted-foreground">Category POCs (queue order)</p>
@@ -256,6 +334,23 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
                             <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]" onClick={() => openAssignPoc(c.id, s.id)} disabled={busy}>
                               <Plus className="mr-1 h-3 w-3" /> POC
                             </Button>
+                          </div>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {FIELD_LABELS.map((f) => {
+                              const on = s[f.key];
+                              return (
+                                <button
+                                  key={f.key}
+                                  type="button"
+                                  onClick={() => toggleSubRequire(c.id, s.id, f.key)}
+                                  disabled={busy}
+                                  className={`rounded-full border px-2 py-0.5 text-[10px] ${on ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground"}`}
+                                  title="Toggle requirement for this sub-category"
+                                >
+                                  {on ? "✓ " : ""}{f.label}
+                                </button>
+                              );
+                            })}
                           </div>
                           {s.pocs.length > 0 && (
                             <div className="mt-1 flex flex-wrap gap-1">

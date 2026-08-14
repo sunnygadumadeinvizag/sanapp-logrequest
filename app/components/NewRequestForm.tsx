@@ -14,7 +14,16 @@ type Cat = {
   name: string;
   description: string | null;
   eligible: boolean;
-  subCategories: { id: string; name: string }[];
+  requireLocation: boolean;
+  requireContactTime: boolean;
+  requireContactPhone: boolean;
+  subCategories: {
+    id: string;
+    name: string;
+    requireLocation: boolean;
+    requireContactTime: boolean;
+    requireContactPhone: boolean;
+  }[];
 };
 
 export function NewRequestForm({
@@ -36,11 +45,19 @@ export function NewRequestForm({
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("MEDIUM");
   const [forUsername, setForUsername] = useState("");
+  const [location, setLocation] = useState("");
+  const [contactTime, setContactTime] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const cat = categories.find((c) => c.id === categoryId);
+  const sub = cat?.subCategories.find((s) => s.id === subCategoryId);
+  // The selected sub-category can override the category's required fields.
+  const needLocation = sub ? sub.requireLocation : (cat?.requireLocation ?? false);
+  const needContactTime = sub ? sub.requireContactTime : (cat?.requireContactTime ?? false);
+  const needContactPhone = sub ? sub.requireContactPhone : (cat?.requireContactPhone ?? false);
   const isPoc = me.role === "POC" || me.role === "ADMIN";
 
   async function submit(e: React.FormEvent) {
@@ -48,6 +65,18 @@ export function NewRequestForm({
     setError(null);
     if (!title.trim() || !description.trim() || !categoryId) {
       setError("Title, description and category are required.");
+      return;
+    }
+    if (needLocation && !location.trim()) {
+      setError("Location is required for this category.");
+      return;
+    }
+    if (needContactTime && !contactTime.trim()) {
+      setError("Preferred time to contact is required for this category.");
+      return;
+    }
+    if (needContactPhone && !contactPhone.trim()) {
+      setError("Phone number is required for this category.");
       return;
     }
     setBusy(true);
@@ -61,6 +90,9 @@ export function NewRequestForm({
           categoryId,
           subCategoryId: subCategoryId || null,
           priority,
+          location: location.trim() || undefined,
+          contactTime: contactTime.trim() || undefined,
+          contactPhone: contactPhone.trim() || undefined,
           forUsername: forUsername || undefined,
         }),
       });
@@ -177,6 +209,50 @@ export function NewRequestForm({
           onChange={(e) => setDescription(e.target.value)}
         />
       </div>
+
+      {(needLocation || needContactTime || needContactPhone) && (
+        <div className="rounded-lg border border-dashed p-3">
+          <p className="mb-2 text-xs font-semibold text-muted-foreground">
+            Contact details{cat ? ` — required by the ${sub ? "sub-category" : "category"} for this request` : ""}
+          </p>
+          <div className="grid gap-4 md:grid-cols-3">
+            {needLocation && (
+              <div className="space-y-1.5">
+                <Label htmlFor="location">Location *</Label>
+                <Input
+                  id="location"
+                  placeholder="Building / room / campus area"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                />
+              </div>
+            )}
+            {needContactTime && (
+              <div className="space-y-1.5">
+                <Label htmlFor="contactTime">Available to contact *</Label>
+                <Input
+                  id="contactTime"
+                  placeholder="e.g. 10:00–12:00, weekdays"
+                  value={contactTime}
+                  onChange={(e) => setContactTime(e.target.value)}
+                />
+              </div>
+            )}
+            {needContactPhone && (
+              <div className="space-y-1.5">
+                <Label htmlFor="contactPhone">Phone number *</Label>
+                <Input
+                  id="contactPhone"
+                  type="tel"
+                  placeholder="Contact number for follow-up"
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <Label htmlFor="file">Attachment (image / PDF, max 1 MB)</Label>
