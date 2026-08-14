@@ -1,0 +1,227 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ------------------------------------------------------------------
+// IIPE App5 (Log Request) — app5_db
+// Fully independent: its own users (provisioned from SSO identity),
+// its own roles, and its own business data.
+//
+// ServiceNow-style request tracking: categories with sub-categories,
+// point-of-contact (POC) queues per category, on-screen notifications,
+// comments with per-user read/unread state, work-duration tracking and
+// full admin auditing.
+//
+// Timestamps are stored as UTC DateTime and displayed in IST.
+// ------------------------------------------------------------------
+
+enum Role {
+  ADMIN // app-admin: manages categories, POCs, sees full tracking
+  POC // point-of-contact: works requests in their categories
+  USER // regular user: raises requests and comments
+}
+
+enum RequestStatus {
+  OPEN // raised, waiting in the category queue (not yet taken)
+  ASSIGNED // a POC has taken it
+  IN_PROGRESS // the POC is actively working on it
+  PENDING // waiting for information from the requester
+  RESOLVED // POC finished; awaiting requester confirmation
+  CLOSED // confirmed done
+  CANCELLED // withdrawn / cancelled
+}
+
+enum RequestPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model AppUser {
+  id            String    @id @default(uuid())
+  ssoUserId     String?   @unique // subject from the central SSO (set on first login)
+  username      String    @unique
+  name          String
+  email         String?
+  // Primary role from the central SSO (STAFF_TEACHING, STAFF_NON_TEACHING,
+  // STUDENT, SCHOLAR, GUEST). Stored at login so category eligibility
+  // (which primary roles may raise requests) can be enforced locally.
+  primaryRole   String?
+  role          Role      @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  pocAssignments PocAssignment[]
+  requestsRaised  Request[]  @relation("Requester")
+  requestsFor     Request[]  @relation("OnBehalf")
+  assignedRequests Request[] @relation("Assignee")
+  comments      RequestComment[]
+  events        RequestEvent[]
+  workLogs      WorkLog[]
+  notifications Notification[]
+  reads         RequestCommentRead[]
+}
+
+model Category {
+  id           String   @id @default(uuid())
+  name         String
+  description  String?
+  // Which SSO primary roles may raise requests in this category.
+  // Empty = everyone. App-admin decides per category.
+  allowedRoles String[] @default([])
+  active       Boolean  @default(true)
+  order        Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  subCategories SubCategory[]
+  pocs         PocAssignment[]
+  requests     Request[]
+}
+
+model SubCategory {
+  id          String   @id @default(uuid())
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  active      Boolean  @default(true)
+  order       Int      @default(0)
+  pocs        PocAssignment[]
+  requests    Request[]
+  @@unique([categoryId, name])
+}
+
+// A user designated as POC for a category (subCategoryId = null) or a specific
+// sub-category. queueOrder drives the first-come-first-served assignment order.
+model PocAssignment {
+  id            String      @id @default(uuid())
+  userId        String
+  user          AppUser     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId    String
+  category      Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  subCategoryId String?
+  subCategory   SubCategory? @relation(fields: [subCategoryId], references: [id], onDelete: Cascade)
+  queueOrder    Int         @default(0)
+  active        Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  @@unique([userId, categoryId, subCategoryId])
+}
+
+model Request {
+  id              String          @id @default(uuid())
+  // Human-readable sequential number (e.g. REQ-0007). Unique per app.
+  number          Int             @unique
+  categoryId      String
+  category        Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  subCategoryId   String?
+  subCategory     SubCategory?    @relation(fields: [subCategoryId], references: [id], onDelete: SetNull)
+  title           String
+  description     String
+  // Who raised it, and who it is for (on-behalf requests created by POCs).
+  requestedById   String
+  requestedBy     AppUser         @relation("Requester", fields: [requestedById], references: [id], onDelete: Cascade)
+  requestedForId  String
+  requestedFor    AppUser         @relation("OnBehalf", fields: [requestedForId], references: [id], onDelete: Restrict)
+  assignedPocId   String?
+  assignedPoc     AppUser?        @relation("Assignee", fields: [assignedPocId], references: [id], onDelete: SetNull)
+  status          RequestStatus   @default(OPEN)
+  priority        RequestPriority @default(MEDIUM)
+  // Cumulative tracked work minutes (POC start/stop sessions + manual logs).
+  totalWorkMinutes Int            @default(0)
+  closedAt        DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  events          RequestEvent[]
+  comments        RequestComment[]
+  workLogs        WorkLog[]
+  attachments     RequestAttachment[]
+  notifications   Notification[]
+  @@index([categoryId, status])
+  @@index([assignedPocId, status])
+  @@index([requestedById, createdAt])
+}
+
+// Audit trail of everything that happens to a request.
+model RequestEvent {
+  id             String   @id @default(uuid())
+  requestId      String
+  request        Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  userId         String
+  user           AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // CREATED | ASSIGNED | TAKEN | MOVED | STARTED | STOPPED | STATUS | COMMENT | CLOSED | REOPENED | CANCELLED
+  type           String
+  message        String
+  minutesWorked  Int? // set on STOPPED / manual work logs
+  toPocId        String? // set on MOVED — who the request went to
+  createdAt      DateTime @default(now())
+}
+
+model RequestComment {
+  id         String   @id @default(uuid())
+  requestId  String
+  request    Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  userId     String
+  user       AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  body       String
+  createdAt  DateTime @default(now())
+  reads      RequestCommentRead[]
+}
+
+// Per-user read/unread state of each comment — users and POCs can mark
+// comments read or unread independently.
+model RequestCommentRead {
+  id        String         @id @default(uuid())
+  commentId String
+  comment   RequestComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  userId    String
+  user      AppUser        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt    DateTime       @default(now())
+  @@unique([commentId, userId])
+}
+
+// POC work tracking: a session between "start working" and "stop working",
+// plus manual time entries. minutes is the accrued duration of the session.
+model WorkLog {
+  id        String   @id @default(uuid())
+  requestId String
+  request   Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  pocId     String
+  poc       AppUser  @relation(fields: [pocId], references: [id], onDelete: Cascade)
+  startedAt DateTime
+  endedAt   DateTime?
+  minutes   Int      @default(0) // 0 while running; set when the session stops
+  note      String?
+  createdAt DateTime @default(now())
+}
+
+model RequestAttachment {
+  id        String  @id @default(uuid())
+  requestId String
+  request   Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  name      String
+  mime      String
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now())
+}
+
+// On-screen notifications (never email). Created when requests are raised,
+// assigned, moved, commented on or closed.
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestId String?
+  request   Request? @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  kind      String // ASSIGNED | MOVED | COMMENT | STATUS | CLOSED | REQUEST_RAISED
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  @@index([userId, read])
+}
