@@ -71,23 +71,17 @@ export async function verifyIdToken(idToken: string) {
 export async function checkAppAccess(user: {
   sub: string;
   username: string;
-}): Promise<{ allowed: boolean; reason?: string }> {
-  try {
-    const res = await fetch(`${MAIN_BASE_URL}/api/app-access`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": MAIN_API_KEY,
-      },
-      body: JSON.stringify({ clientId: CLIENT_ID, user }),
-      cache: "no-store",
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) return { allowed: false, reason: `access_check_failed_${res.status}` };
-    const data = await res.json();
-    return { allowed: data.allowed === true, reason: data.reason };
-  } catch {
-    // Main unreachable — fail open to avoid locking everyone out.
-    return { allowed: true };
+}): Promise<{ allowed: boolean; application?: { name: string } }> {
+  const res = await fetch(`${MAIN_BASE_URL}/api/access/check`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-app-key": MAIN_API_KEY,
+    },
+    body: JSON.stringify({ userId: user.sub, username: user.username, clientId: CLIENT_ID }),
+  });
+  if (!res.ok) {
+    throw new Error(`Main access check failed (${res.status})`);
   }
+  return res.json();
 }
