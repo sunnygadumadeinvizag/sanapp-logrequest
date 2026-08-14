@@ -82,7 +82,7 @@ export function NotificationsClient() {
         ) : (
           <div className="divide-y">
             {rows.map((n) => (
-              <div key={n.id} className={`flex items-start justify-between gap-3 p-3 ${n.read ? "" : "bg-primary/5"}`}>
+              <div key={n.id} className={`flex items-start justify-between gap-3 p-3 transition-colors ${n.read ? "" : "bg-primary/5"} ${n.requestId ? "group cursor-pointer hover:bg-muted/40" : ""}`}>
                 <a
                   href={n.requestId ? apiPath(`/requests/${n.requestId}`) : undefined}
                   className={`min-w-0 flex-1 ${n.requestId ? "cursor-pointer" : ""}`}

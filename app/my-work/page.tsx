@@ -85,7 +85,7 @@ export default async function MyWorkPage() {
         <div className="divide-y">
           {perRequest.size === 0 && <p className="p-6 text-sm text-muted-foreground">No work logged yet.</p>}
           {[...perRequest.entries()].map(([reqId, v]) => (
-            <a key={reqId} href={apiPath(`/requests/${reqId}`)} className="flex items-center justify-between p-3 hover:bg-muted/40">
+            <a key={reqId} href={apiPath(`/requests/${reqId}`)} className="group flex items-center justify-between p-3 transition-colors hover:bg-muted/40">
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{fmtRequestNumber(v.number)} — {v.title}</p>
                 <p className="text-xs text-muted-foreground">{v.sessions} session{v.sessions === 1 ? "" : "s"}</p>
@@ -103,7 +103,7 @@ export default async function MyWorkPage() {
         <div className="divide-y">
           {workLogs.length === 0 && <p className="p-6 text-sm text-muted-foreground">No work sessions yet.</p>}
           {workLogs.map((w) => (
-            <div key={w.id} className="flex items-center justify-between gap-3 p-3 text-sm">
+            <div key={w.id} className="group flex items-center justify-between gap-3 p-3 text-sm transition-colors hover:bg-muted/40">
               <a href={apiPath(`/requests/${w.requestId}`)} className="min-w-0 cursor-pointer truncate">
                 <span className="font-medium">{fmtRequestNumber(w.request.number)}</span> — {w.request.title}
                 {w.note && <span className="text-muted-foreground"> · {w.note}</span>}

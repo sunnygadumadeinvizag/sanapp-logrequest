@@ -114,7 +114,7 @@ export function QueueClient({ meUsername }: { meUsername: string }) {
             {waiting.map((w) => {
               const mine = w.assignedPoc?.name ?? null;
               return (
-                <div key={w.id} className="flex items-start justify-between gap-3 p-3">
+                <div key={w.id} className="group flex items-start justify-between gap-3 p-3 transition-colors hover:bg-muted/40">
                   <a href={apiPath(`/requests/${w.id}`)} className="min-w-0 flex-1 cursor-pointer">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs font-semibold text-primary">{w.requestId}</span>
