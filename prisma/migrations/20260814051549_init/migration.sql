@@ -1,62 +1,26 @@
-/*
-  Warnings:
+-- CreateEnum
+CREATE TYPE "Role" AS ENUM ('ADMIN', 'POC', 'USER');
 
-  - You are about to drop the column `isApprover` on the `AppUser` table. All the data in the column will be lost.
-  - You are about to drop the column `isPoc` on the `AppUser` table. All the data in the column will be lost.
-  - You are about to drop the `Booking` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `Building` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `Facility` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `FacilityRoleLimit` table. If the table is not empty, all the data it contains will be lost.
-
-*/
 -- CreateEnum
 CREATE TYPE "RequestStatus" AS ENUM ('OPEN', 'ASSIGNED', 'IN_PROGRESS', 'PENDING', 'RESOLVED', 'CLOSED', 'CANCELLED');
 
 -- CreateEnum
 CREATE TYPE "RequestPriority" AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'URGENT');
 
--- AlterEnum
-ALTER TYPE "Role" ADD VALUE 'POC';
+-- CreateTable
+CREATE TABLE "AppUser" (
+    "id" TEXT NOT NULL,
+    "ssoUserId" TEXT,
+    "username" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "email" TEXT,
+    "primaryRole" TEXT,
+    "role" "Role" NOT NULL DEFAULT 'USER',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
--- DropForeignKey
-ALTER TABLE "Booking" DROP CONSTRAINT "Booking_cancelledById_fkey";
-
--- DropForeignKey
-ALTER TABLE "Booking" DROP CONSTRAINT "Booking_facilityId_fkey";
-
--- DropForeignKey
-ALTER TABLE "Booking" DROP CONSTRAINT "Booking_forUserId_fkey";
-
--- DropForeignKey
-ALTER TABLE "Booking" DROP CONSTRAINT "Booking_userId_fkey";
-
--- DropForeignKey
-ALTER TABLE "Facility" DROP CONSTRAINT "Facility_buildingId_fkey";
-
--- DropForeignKey
-ALTER TABLE "FacilityRoleLimit" DROP CONSTRAINT "FacilityRoleLimit_facilityId_fkey";
-
--- AlterTable
-ALTER TABLE "AppUser" DROP COLUMN "isApprover",
-DROP COLUMN "isPoc";
-
--- DropTable
-DROP TABLE "Booking";
-
--- DropTable
-DROP TABLE "Building";
-
--- DropTable
-DROP TABLE "Facility";
-
--- DropTable
-DROP TABLE "FacilityRoleLimit";
-
--- DropEnum
-DROP TYPE "BookingStatus";
-
--- DropEnum
-DROP TYPE "BookingType";
+    CONSTRAINT "AppUser_pkey" PRIMARY KEY ("id")
+);
 
 -- CreateTable
 CREATE TABLE "Category" (
@@ -193,6 +157,12 @@ CREATE TABLE "Notification" (
 
     CONSTRAINT "Notification_pkey" PRIMARY KEY ("id")
 );
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AppUser_ssoUserId_key" ON "AppUser"("ssoUserId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AppUser_username_key" ON "AppUser"("username");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "SubCategory_categoryId_name_key" ON "SubCategory"("categoryId", "name");
