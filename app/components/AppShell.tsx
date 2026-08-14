@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { cookies } from "next/headers";
 import {
   AppsMenu,
   apiPath,
@@ -10,6 +11,7 @@ import {
   UserMenu,
 } from "iipe-common-ui";
 import type { AppUserSession } from "@/lib/session";
+import { verifyAppSession } from "@/lib/session";
 import { roleLabel } from "@/lib/labels";
 import { prisma } from "@/lib/prisma";
 import { NotifBell } from "./NotifBell";
@@ -38,6 +40,12 @@ export async function AppShell({
     basePath: process.env.BASE_PATH ?? "/logrequest",
     fallback: "Log Request",
   });
+  // The central SSO role is carried in the session JWT (pages rebuild the
+  // AppUserSession literal from the local row, so re-derive it here).
+  const ssoRole =
+    (await verifyAppSession((await cookies()).get("app5_session")?.value ?? ""))?.ssoRole ??
+    "USER";
+  const isSuperAdmin = ssoRole === "SUPER_ADMIN";
   const local = await prisma.appUser.findUnique({ where: { username: me.username } });
   const userId = local?.id ?? "";
   const unreadCount = userId ? await prisma.notification.count({ where: { userId, read: false } }) : 0;
@@ -107,6 +115,12 @@ export async function AppShell({
             >
               <a href={`${SSO_BASE_URL}/account`}>My Account</a>
               <a href={`${MAIN_BASE_URL}/my-apps`}>My Apps</a>
+              {isSuperAdmin && (
+                <>
+                  <div className="iipe-dropdown-section">Admin Console</div>
+                  <a href={`${MAIN_BASE_URL}/admin-console`}>Admin Console</a>
+                </>
+              )}
             </UserMenu>
           </>
         ),
