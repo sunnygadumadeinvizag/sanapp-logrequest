@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AppShell } from "@app/components/AppShell";
@@ -9,12 +10,9 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const me = await currentUser();
+  // The proxy does not run for the exact basePath root, so guard it here.
   if (!me) {
-    return (
-      <AppShell me={{ sub: "", username: "", name: "", email: "", role: "USER", primaryRole: "" }} sidebarItems={[]}>
-        <p className="iipe-page-sub">Session not found — please sign in.</p>
-      </AppShell>
-    );
+    redirect(process.env.APP_BASE_URL! + "/api/start-oauth");
   }
 
   const isPoc = me.role === "POC" || me.role === "ADMIN";
