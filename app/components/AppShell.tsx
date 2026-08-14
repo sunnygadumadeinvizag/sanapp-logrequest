@@ -33,7 +33,7 @@ export async function AppShell({
   children: ReactNode;
 }) {
   // The registry name for this deployment (one project can host several apps):
-  // resolved from iipe-main by base path, falling back to the project name.
+  // resolved from sanapp-main by base path, falling back to the project name.
   const appName = await lookupAppName({
     mainBaseUrl: MAIN_BASE_URL,
     appKey: process.env.MAIN_API_KEY,
@@ -127,7 +127,7 @@ export async function AppShell({
       }}
       sidebarItems={items}
     >
-      <SessionGuard channel="iipe-app5-session" />
+      <SessionGuard channel="sanapp-logrequest-session" />
       <NotifBell initial={unreadCount} />
       {children}
     </PageShell>

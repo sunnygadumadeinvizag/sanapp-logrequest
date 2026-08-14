@@ -1,7 +1,7 @@
 # IIPE Log Request (sanapp-logrequest)
 
 Independent application #5 of the IIPE intranet — a ServiceNow-style request
-tracking app with its **own database** (`app5_db`) and **own roles**.
+tracking app with its **own database** (`sanapp_logrequest_db`) and **own roles**.
 
 - **SSO** (sanapp-sso) answers *who are you?*
 - **Main** (sanapp-main) answers *can you access this app?*
@@ -54,7 +54,7 @@ pnpm dev                    # http://localhost:3006
 ```
 
 SSO and Main must be running locally on ports 3000/3001 (their dev configs
-already register the `iipe-app5` OIDC client and app entry).
+already register the `sanapp-logrequest` OIDC client and app entry).
 
 ## Author
 

@@ -8,7 +8,7 @@ datasource db {
 }
 
 // ------------------------------------------------------------------
-// IIPE App5 (Log Request) — app5_db
+// IIPE App5 (Log Request) — sanapp_logrequest_db
 // Fully independent: its own users (provisioned from SSO identity),
 // its own roles, and its own business data.
 //

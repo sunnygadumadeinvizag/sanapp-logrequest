@@ -38,7 +38,7 @@ export type SsoUser = {
 let ssoUsersCache: { at: number; users: SsoUser[] } | null = null;
 
 /**
- * List of users from the central SSO registry (identity lives in sso_db, not
+ * List of users from the central SSO registry (identity lives in sanapp_sso_db, not
  * here). Used by POCs to create requests on behalf of a user, and by ADMINs
  * for POC designation. Cached briefly to keep the SSO happy.
  */

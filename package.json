@@ -2,7 +2,7 @@
   "name": "sanapp-logrequest",
   "version": "0.1.0",
   "private": true,
-  "description": "IIPE Log Request — independent application #5 (own database app5_db, own roles). ServiceNow-style request tracking with categories, sub-categories, POC queues, on-screen notifications.",
+  "description": "IIPE Log Request — independent application #5 (own database sanapp_logrequest_db, own roles). ServiceNow-style request tracking with categories, sub-categories, POC queues, on-screen notifications.",
   "scripts": {
     "dev": "next dev -p 3006",
     "build": "next build",
