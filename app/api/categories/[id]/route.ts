@@ -36,6 +36,7 @@ export async function PATCH(request: NextRequest, ctx: RouteCtx) {
   if (typeof body.requireLocation === "boolean") data.requireLocation = body.requireLocation;
   if (typeof body.requireContactTime === "boolean") data.requireContactTime = body.requireContactTime;
   if (typeof body.requireContactPhone === "boolean") data.requireContactPhone = body.requireContactPhone;
+  if (typeof body.directAssign === "boolean") data.directAssign = body.directAssign;
 
   const updated = await prisma.category.update({ where: { id }, data });
 
@@ -53,6 +54,7 @@ export async function PATCH(request: NextRequest, ctx: RouteCtx) {
           requireLocation: typeof s.requireLocation === "boolean" ? s.requireLocation : undefined,
           requireContactTime: typeof s.requireContactTime === "boolean" ? s.requireContactTime : undefined,
           requireContactPhone: typeof s.requireContactPhone === "boolean" ? s.requireContactPhone : undefined,
+          directAssign: typeof s.directAssign === "boolean" ? s.directAssign : undefined,
         },
         create: {
           categoryId: id,
@@ -62,6 +64,7 @@ export async function PATCH(request: NextRequest, ctx: RouteCtx) {
           requireLocation: typeof s.requireLocation === "boolean" ? s.requireLocation : false,
           requireContactTime: typeof s.requireContactTime === "boolean" ? s.requireContactTime : false,
           requireContactPhone: typeof s.requireContactPhone === "boolean" ? s.requireContactPhone : false,
+          directAssign: typeof s.directAssign === "boolean" ? s.directAssign : false,
           order: (await prisma.subCategory.count({ where: { categoryId: id } })) + 1,
         },
       });

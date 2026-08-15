@@ -34,6 +34,7 @@ type Cat = {
   requireLocation: boolean;
   requireContactTime: boolean;
   requireContactPhone: boolean;
+  directAssign: boolean;
   subCategories: {
     id: string;
     name: string;
@@ -42,6 +43,7 @@ type Cat = {
     requireLocation: boolean;
     requireContactTime: boolean;
     requireContactPhone: boolean;
+    directAssign: boolean;
     pocs: { id: string; name: string }[];
   }[];
   pocs: { id: string; name: string; username: string }[];
@@ -213,6 +215,35 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
         requireLocation: s.requireLocation,
         requireContactTime: s.requireContactTime,
         requireContactPhone: s.requireContactPhone,
+        directAssign: s.directAssign,
+      })),
+    });
+    setCats((cs) => cs.map((c) => (c.id === catId ? { ...c, subCategories: nextSubs } : c)));
+  }
+
+  function toggleDirect(catId: string) {
+    const cat = cats.find((c) => c.id === catId);
+    if (!cat) return;
+    const next = !cat.directAssign;
+    save(catId, { directAssign: next });
+    setCats((cs) => cs.map((c) => (c.id === catId ? { ...c, directAssign: next } : c)));
+  }
+
+  function toggleSubDirect(catId: string, subId: string) {
+    const cat = cats.find((c) => c.id === catId);
+    if (!cat) return;
+    const nextSubs = cat.subCategories.map((s) =>
+      s.id === subId ? { ...s, directAssign: !s.directAssign } : s
+    );
+    save(catId, {
+      subCategories: nextSubs.map((s) => ({
+        name: s.name,
+        description: s.description,
+        active: s.active,
+        requireLocation: s.requireLocation,
+        requireContactTime: s.requireContactTime,
+        requireContactPhone: s.requireContactPhone,
+        directAssign: s.directAssign,
       })),
     });
     setCats((cs) => cs.map((c) => (c.id === catId ? { ...c, subCategories: nextSubs } : c)));
@@ -250,6 +281,7 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
         requireLocation: s.requireLocation,
         requireContactTime: s.requireContactTime,
         requireContactPhone: s.requireContactPhone,
+        directAssign: s.directAssign,
       })),
     });
     setCats((cs) => cs.map((c) => (c.id === catId ? { ...c, subCategories: nextSubs } : c)));
@@ -356,6 +388,24 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
                     </div>
                   </div>
 
+                  {/* Direct-assign (raised against a person) */}
+                  <div>
+                    <p className="mb-1 text-xs font-semibold text-muted-foreground">Assignment mode</p>
+                    <button
+                      type="button"
+                      onClick={() => toggleDirect(c.id)}
+                      disabled={busy}
+                      className={`rounded-full border px-2 py-0.5 text-xs ${c.directAssign ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground"}`}
+                    >
+                      {c.directAssign ? "✓ " : ""}Raised directly against a user (any app user)
+                    </button>
+                    {c.directAssign && (
+                      <p className="mt-1 text-[10px] text-muted-foreground">
+                        Requests in this category are assigned straight to the selected person (FIFO by age) — no POC queue.
+                      </p>
+                    )}
+                  </div>
+
                   {/* Category POCs */}
                   <div>
                     <p className="mb-1 text-xs font-semibold text-muted-foreground">Category POCs (queue order)</p>
@@ -421,7 +471,16 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
                                 </button>
                               );
                             })}
-                          </div>
+                                                 <button
+                              type="button"
+                              onClick={() => toggleSubDirect(c.id, s.id)}
+                              disabled={busy}
+                              className={`rounded-full border px-2 py-0.5 text-[10px] ${s.directAssign ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground"}`}
+                              title="Raise directly against a user for this sub-category"
+                            >
+                              {s.directAssign ? "✓ " : ""}Direct to user
+                            </button>
+     </div>
                           {s.pocs.length > 0 && (
                             <div className="mt-1 flex flex-wrap gap-1">
                               {s.pocs.map((p) => (

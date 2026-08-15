@@ -52,12 +52,14 @@ export default async function NewRequestPage({
             requireLocation: c.requireLocation,
             requireContactTime: c.requireContactTime,
             requireContactPhone: c.requireContactPhone,
+            directAssign: c.directAssign,
             subCategories: c.subCategories.map((s) => ({
               id: s.id,
               name: s.name,
               requireLocation: s.requireLocation,
               requireContactTime: s.requireContactTime,
               requireContactPhone: s.requireContactPhone,
+              directAssign: s.directAssign,
             })),
           }))}
           me={{

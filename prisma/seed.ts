@@ -33,33 +33,45 @@ async function main() {
   // ------------------------------------------------------------------
   const categories = [
     {
+      key: "rfi",
+      name: "Request for Information",
+      description: "Raise a request directly against a person (any user with app access) — for information, data or documents. Assigned straight to that user.",
+      directAssign: true,
+      subs: ["General information", "Data / reports", "Certificates / documents"],
+    },
+    {
       key: "electricity",
       name: "Electricity Works",
       description: "Power failures, wiring, lighting, UPS and electrical repairs.",
+      directAssign: false,
       subs: ["Lighting", "Power supply", "UPS / Inverter", "Wiring & sockets"],
     },
     {
       key: "civil",
       name: "Civil Works",
       description: "Plumbing, masonry, painting, carpentry and building repairs.",
+      directAssign: false,
       subs: ["Plumbing", "Painting", "Carpentry", "Masonry"],
     },
     {
       key: "it-hardware",
       name: "IT Hardware",
       description: "Desktop, laptop, printer and peripheral faults.",
+      directAssign: false,
       subs: ["Desktop", "Laptop", "Printer / Scanner", "Networking hardware"],
     },
     {
       key: "it-software",
       name: "IT Software",
       description: "Software installation, accounts, licensing and application access.",
+      directAssign: false,
       subs: ["Installation", "Licensing", "Application access", "Operating system"],
     },
     {
       key: "it-network",
       name: "IT Network",
       description: "Wi-Fi, LAN, internet connectivity and network services.",
+      directAssign: false,
       subs: ["Wi-Fi", "LAN", "Internet", "VPN"],
     },
   ] as const;
@@ -68,13 +80,14 @@ async function main() {
   for (const [i, c] of categories.entries()) {
     const cat = await prisma.category.upsert({
       where: { id: `seed-${c.key}` },
-      update: { name: c.name, description: c.description, order: i, active: true },
+      update: { name: c.name, description: c.description, order: i, active: true, directAssign: !!c.directAssign },
       create: {
         id: `seed-${c.key}`,
         name: c.name,
         description: c.description,
         order: i,
         active: true,
+        directAssign: !!c.directAssign,
         // Everyone may raise initially; the app-admin tunes per category.
         allowedRoles: [],
       },

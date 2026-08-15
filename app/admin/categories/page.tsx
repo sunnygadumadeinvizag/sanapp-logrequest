@@ -68,6 +68,7 @@ export default async function AdminCategoriesPage() {
             requireLocation: c.requireLocation,
             requireContactTime: c.requireContactTime,
             requireContactPhone: c.requireContactPhone,
+            directAssign: c.directAssign,
             subCategories: c.subCategories.map((s) => ({
               id: s.id,
               name: s.name,
@@ -76,6 +77,7 @@ export default async function AdminCategoriesPage() {
               requireLocation: s.requireLocation,
               requireContactTime: s.requireContactTime,
               requireContactPhone: s.requireContactPhone,
+              directAssign: s.directAssign,
               pocs: s.pocs.map((p) => ({ id: p.id, name: p.user.name })),
             })),
             pocs: c.pocs.map((p) => ({ id: p.id, name: p.user.name, username: p.user.username })),

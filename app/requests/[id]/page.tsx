@@ -169,6 +169,7 @@ export default async function RequestDetailPage({
             status: r.status,
             priority: r.priority,
             totalWorkMinutes: r.totalWorkMinutes,
+            directAssign: r.subCategory ? r.subCategory.directAssign : r.category.directAssign,
             assignedPoc: r.assignedPoc
               ? { name: r.assignedPoc.name, username: r.assignedPoc.username }
               : null,

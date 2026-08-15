@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sessionUser, serializeRequest, notify, fmtRequestNumber } from "@/lib/requests";
+import { listSsoUsers } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -62,10 +63,13 @@ export async function GET(request: NextRequest) {
     ];
   }
 
+  // Assigned scope is the assignee's working queue — serve FIFO (oldest first)
+  // so the first request raised against a user is handled first.
+  const orderBy = scope === "assigned" ? [{ createdAt: "asc" as const }] : [{ createdAt: "desc" as const }];
   const [rows, total] = await Promise.all([
     prisma.request.findMany({
       where,
-      orderBy: [{ createdAt: "desc" }],
+      orderBy,
       skip: (page - 1) * limit,
       take: limit,
       include: {
@@ -109,6 +113,9 @@ export async function POST(request: NextRequest) {
   const priority = ["LOW", "MEDIUM", "HIGH", "URGENT"].includes(body.priority)
     ? body.priority
     : "MEDIUM";
+  // Direct-assign: when the category/sub-category has directAssign, the
+  // request is raised AGAINST a specific person and assigned straight to them.
+  const againstUsername = body.againstUsername ? String(body.againstUsername).trim() : "";
   // On-behalf: POCs/ADMINs may raise for another user.
   const forUsername = body.forUsername ? String(body.forUsername).trim() : "";
   let requestedFor = me;
@@ -133,6 +140,33 @@ export async function POST(request: NextRequest) {
       where: { id: subCategoryId, categoryId, active: true },
     });
     if (!sub) return NextResponse.json({ error: "subcategory_not_found" }, { status: 404 });
+  }
+
+  // Direct-assign category/sub-category: the requester picks the person the
+  // request is raised against. That user becomes the assignee immediately.
+  const directAssign = sub ? sub.directAssign : category.directAssign;
+  let directTarget: any = null;
+  if (directAssign) {
+    if (!againstUsername) {
+      return NextResponse.json({ error: "against_user_required" }, { status: 400 });
+    }
+    directTarget = await prisma.appUser.findUnique({ where: { username: againstUsername } });
+    if (!directTarget) {
+      // Not signed into this app yet — provision from the central SSO registry
+      // so requests can be raised against any user the app has access to.
+      const sso = (await listSsoUsers()).find((u) => u.username === againstUsername);
+      if (!sso) return NextResponse.json({ error: "user_not_found" }, { status: 404 });
+      directTarget = await prisma.appUser.create({
+        data: {
+          ssoUserId: sso.id,
+          username: sso.username,
+          name: sso.name,
+          email: sso.email,
+          primaryRole: sso.primaryRole,
+          role: "USER",
+        },
+      });
+    }
   }
 
   // Required contact fields — the app-admin decides per category, and a
@@ -172,7 +206,8 @@ export async function POST(request: NextRequest) {
           priority,
           requestedById: me.id,
           requestedForId: requestedFor.id,
-          status: "OPEN",
+          status: directAssign && directTarget ? "ASSIGNED" : "OPEN",
+          assignedPocId: directAssign && directTarget ? directTarget.id : undefined,
           events: {
             create: [
               {
@@ -180,6 +215,16 @@ export async function POST(request: NextRequest) {
                 type: "CREATED",
                 message: me.id === requestedFor.id ? "Request raised" : `Request raised on behalf of ${requestedFor.name}`,
               },
+              ...(directAssign && directTarget
+                ? [
+                    {
+                      userId: me.id,
+                      type: "ASSIGNED",
+                      message: `Assigned to ${directTarget.name} (raised directly against user)`,
+                      toPocId: directTarget.id,
+                    },
+                  ]
+                : []),
             ],
           },
         },
@@ -197,20 +242,31 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // First-come-first-served auto-assignment: pick the active POC of the
-  // category (or sub-category) with the lowest queue order and fewest open
-  // tasks. If none exists, the request stays OPEN in the queue for manual take.
-  const pocPick = await prisma.pocAssignment.findMany({
-    where: {
-      active: true,
-      OR: [
-        { subCategoryId: subCategoryId ?? undefined, categoryId },
-        { subCategoryId: null, categoryId },
-      ],
-    },
-    include: { user: true },
-  });
-  if (pocPick.length > 0) {
+  // Direct-assign requests are already assigned to the raised-against user —
+  // notify them and skip the POC queue entirely.
+  if (directAssign && directTarget) {
+    await notify(
+      [directTarget.id],
+      "ASSIGNED",
+      "Request assigned to you",
+      `${fmtRequestNumber(created.number)} — ${created.title} (raised directly against you)`,
+      created.id
+    );
+  } else {
+    // First-come-first-served auto-assignment: pick the active POC of the
+    // category (or sub-category) with the lowest queue order and fewest open
+    // tasks. If none exists, the request stays OPEN in the queue for manual take.
+    const pocPick = await prisma.pocAssignment.findMany({
+      where: {
+        active: true,
+        OR: [
+          { subCategoryId: subCategoryId ?? undefined, categoryId },
+          { subCategoryId: null, categoryId },
+        ],
+      },
+      include: { user: true },
+    });
+    if (pocPick.length > 0) {
     const openCounts = await Promise.all(
       pocPick.map((a) =>
         prisma.request.count({
@@ -256,6 +312,7 @@ export async function POST(request: NextRequest) {
       `${fmtRequestNumber(created.number)} — ${created.title}`,
       created.id
     );
+    }
   }
 
   await notify(

@@ -55,6 +55,7 @@ export type DetailData = {
     status: string;
     priority: string;
     totalWorkMinutes: number;
+    directAssign?: boolean;
     assignedPoc: { name: string; username: string } | null;
   };
   comments: { id: string; body: string; readByMe: boolean; user: { name: string; username: string }; createdAt: string }[];
@@ -424,7 +425,7 @@ export function RequestDetailClient({
         <Badge>{STATUS_LABELS[request.status] ?? request.status}</Badge>
         <Badge variant="secondary">{PRIORITY_LABELS[request.priority] ?? request.priority}</Badge>
         {request.assignedPoc && (
-          <Badge variant="outline">POC: {request.assignedPoc.name}</Badge>
+          <Badge variant="outline">{request.directAssign ? "Assigned to" : "POC"}: {request.assignedPoc.name}</Badge>
         )}
         <span className="text-xs text-muted-foreground">
           Work logged: {fmtMinutes(request.totalWorkMinutes)}

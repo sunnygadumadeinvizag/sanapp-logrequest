@@ -17,12 +17,14 @@ type Cat = {
   requireLocation: boolean;
   requireContactTime: boolean;
   requireContactPhone: boolean;
+  directAssign: boolean;
   subCategories: {
     id: string;
     name: string;
     requireLocation: boolean;
     requireContactTime: boolean;
     requireContactPhone: boolean;
+    directAssign: boolean;
   }[];
 };
 
@@ -45,6 +47,7 @@ export function NewRequestForm({
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("MEDIUM");
   const [forUsername, setForUsername] = useState("");
+  const [againstUsername, setAgainstUsername] = useState("");
   const [location, setLocation] = useState("");
   const [contactTime, setContactTime] = useState("");
   const [contactPhone, setContactPhone] = useState("");
@@ -58,6 +61,8 @@ export function NewRequestForm({
   const needLocation = sub ? sub.requireLocation : (cat?.requireLocation ?? false);
   const needContactTime = sub ? sub.requireContactTime : (cat?.requireContactTime ?? false);
   const needContactPhone = sub ? sub.requireContactPhone : (cat?.requireContactPhone ?? false);
+  // Direct-assign: raised against a specific person (sub-category overrides).
+  const directAssign = sub ? sub.directAssign : (cat?.directAssign ?? false);
   const isPoc = me.role === "POC" || me.role === "ADMIN";
 
   async function submit(e: React.FormEvent) {
@@ -79,6 +84,10 @@ export function NewRequestForm({
       setError("Phone number is required for this category.");
       return;
     }
+    if (directAssign && !againstUsername) {
+      setError("Choose the person this request is raised against.");
+      return;
+    }
     setBusy(true);
     try {
       const res = await fetch(apiPath("/api/requests"), {
@@ -94,6 +103,7 @@ export function NewRequestForm({
           contactTime: contactTime.trim() || undefined,
           contactPhone: contactPhone.trim() || undefined,
           forUsername: forUsername || undefined,
+          againstUsername: againstUsername || undefined,
         }),
       });
       const data = await res.json();
@@ -134,6 +144,7 @@ export function NewRequestForm({
             onChange={(e) => {
               setCategoryId(e.target.value);
               setSubCategoryId("");
+              setAgainstUsername("");
             }}
           >
             {eligibleCats.length === 0 && <option value="">No categories available for your role</option>}
@@ -192,6 +203,26 @@ export function NewRequestForm({
           </div>
         )}
       </div>
+
+      {directAssign && (
+        <div className="space-y-1.5">
+          <Label htmlFor="against">Raised against user *</Label>
+          <select
+            id="against"
+            className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+            value={againstUsername}
+            onChange={(e) => setAgainstUsername(e.target.value)}
+          >
+            <option value="">— select the person —</option>
+            {ssoUsers.map((u) => (
+              <option key={u.username} value={u.username}>{u.name} ({u.username})</option>
+            ))}
+          </select>
+          <p className="text-xs text-muted-foreground">
+            This request will be assigned directly to the selected person and handled like a normal request.
+          </p>
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <Label htmlFor="title">Title *</Label>

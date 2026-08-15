@@ -81,6 +81,10 @@ model Category {
   requireLocation     Boolean @default(false)
   requireContactTime  Boolean @default(false)
   requireContactPhone Boolean @default(false)
+  // True = requests in this category are raised directly AGAINST a specific
+  // person (any user the app has access to). The request is assigned straight
+  // to that user, who handles it like a normal log request (FIFO by age).
+  directAssign    Boolean  @default(false)
   active       Boolean  @default(true)
   order        Int      @default(0)
   createdAt    DateTime @default(now())
@@ -100,6 +104,8 @@ model SubCategory {
   requireLocation     Boolean @default(false)
   requireContactTime  Boolean @default(false)
   requireContactPhone Boolean @default(false)
+  // Override the category's direct-assign behaviour for this sub-category.
+  directAssign Boolean  @default(false)
   active      Boolean  @default(true)
   order       Int      @default(0)
   pocs        PocAssignment[]
