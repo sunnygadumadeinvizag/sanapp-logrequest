@@ -195,6 +195,26 @@ export function NewRequestForm({
     <form onSubmit={submit} className="space-y-4">
       {error && <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 
+      <div className="space-y-1.5">
+        <Label htmlFor="asset">Against my asset (optional)</Label>
+        <select
+          id="asset"
+          className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+          value={assetTag}
+          onChange={(e) => pickAsset(e.target.value)}
+        >
+          <option value="">— no asset —</option>
+          {myAssets.map((a) => (
+            <option key={a.id} value={a.tag}>
+              {a.tag} — {a.name}{a.section ? ` (${a.section})` : ""}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-muted-foreground">
+          Pick an asset issued to you — its section and sub-category are selected automatically, and the section&apos;s POC takes care of the request.
+        </p>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="cat">Category *</Label>
@@ -232,25 +252,7 @@ export function NewRequestForm({
         </div>
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="asset">Against my asset (optional)</Label>
-        <select
-          id="asset"
-          className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-          value={assetTag}
-          onChange={(e) => pickAsset(e.target.value)}
-        >
-          <option value="">— no asset —</option>
-          {myAssets.map((a) => (
-            <option key={a.id} value={a.tag}>
-              {a.tag} — {a.name}{a.section ? ` (${a.section})` : ""}
-            </option>
-          ))}
-        </select>
-        <p className="text-xs text-muted-foreground">
-          Pick an asset issued to you — its section and sub-category are selected automatically, and the section&apos;s POC takes care of the request.
-        </p>
-      </div>
+
 
       {isIntranetIssue && (
         <div className="space-y-1.5">
