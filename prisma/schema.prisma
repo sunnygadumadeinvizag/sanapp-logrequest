@@ -148,6 +148,11 @@ model Request {
   // by the POC queue of the section/category the asset belongs to.
   assetTag        String? // e.g. IIPE-IT-0001
   assetName       String? // asset display name
+  // Optional reference to an application from the central intranet (raised
+  // via Main's "Technical Issues" or directly here under "Intranet Issue").
+  appName         String? // e.g. Academic ERP
+  resolution      String? // resolution / reply recorded when the request closes
+  resolvedAt      DateTime? // when it was resolved
   // Who raised it, and who it is for (on-behalf requests created by POCs).
   requestedById   String
   requestedBy     AppUser         @relation("Requester", fields: [requestedById], references: [id], onDelete: Cascade)

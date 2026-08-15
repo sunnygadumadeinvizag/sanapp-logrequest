@@ -171,6 +171,15 @@ export default async function RequestDetailPage({
         </div>
       )}
 
+      {r.appName && (
+        <div className="mb-4 rounded-lg border bg-card p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Against application</p>
+          <p className="mt-0.5 text-sm">
+            <span className="font-semibold text-primary">🌐 {r.appName}</span>
+          </p>
+        </div>
+      )}
+
       <RequestDetailClient
         data={{
           request: {
@@ -185,6 +194,9 @@ export default async function RequestDetailPage({
               : null,
             assetTag: r.assetTag ?? null,
             assetName: r.assetName ?? null,
+            appName: r.appName ?? null,
+            resolution: r.resolution ?? null,
+            resolvedAt: r.resolvedAt ? r.resolvedAt.toISOString() : null,
           },
           comments: r.comments.map((c) => ({
             id: c.id,

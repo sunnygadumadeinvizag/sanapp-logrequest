@@ -74,6 +74,13 @@ async function main() {
       directAssign: false,
       subs: ["Wi-Fi", "LAN", "Internet", "VPN"],
     },
+    {
+      key: "intranet-issue",
+      name: "Intranet Issue",
+      description: "Technical issues reported against the intranet applications (Academic ERP, Facilities, Log Request, etc.). Raised from Main's Technical Issues page or directly here.",
+      directAssign: false,
+      subs: ["Login / access", "Page / form not working", "Data / report wrong", "Other"],
+    },
   ] as const;
 
   const catIds: Record<string, string> = {};
@@ -130,6 +137,10 @@ async function main() {
     { user: "sanyasi", cat: "it-software", order: 1 },
     { user: "sanyasi", cat: "it-network", order: 1 },
     { user: "ramesh", cat: "it-network", order: 2 },
+    // Intranet issues — sanyasi first, ramesh second, admin fallback
+    { user: "admin", cat: "intranet-issue", order: 3 },
+    { user: "sanyasi", cat: "intranet-issue", order: 1 },
+    { user: "ramesh", cat: "intranet-issue", order: 2 },
   ];
 
   for (const a of assignments) {

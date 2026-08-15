@@ -59,6 +59,9 @@ export type DetailData = {
     assignedPoc: { name: string; username: string } | null;
     assetTag?: string | null;
     assetName?: string | null;
+    appName?: string | null;
+    resolution?: string | null;
+    resolvedAt?: string | null;
   };
   comments: { id: string; body: string; readByMe: boolean; user: { name: string; username: string }; createdAt: string }[];
   attachments: { id: string; name: string; mime: string; size: number }[];
@@ -433,6 +436,11 @@ export function RequestDetailClient({
           <Badge variant="outline" title={request.assetName ?? undefined}>
             📦 {request.assetTag}
             {request.assetName ? ` — ${request.assetName}` : ""}
+          </Badge>
+        )}
+        {request.appName && (
+          <Badge variant="outline">
+            🌐 {request.appName}
           </Badge>
         )}
         <span className="text-xs text-muted-foreground">

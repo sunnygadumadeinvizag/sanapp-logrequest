@@ -113,6 +113,8 @@ export async function POST(request: NextRequest) {
   // Optional reference to an asset from the Inventory app (shared database).
   const assetTag = typeof body.assetTag === "string" ? body.assetTag.trim().slice(0, 64) || null : null;
   const assetName = typeof body.assetName === "string" ? body.assetName.trim().slice(0, 255) || null : null;
+  // Optional reference to an intranet application (Intranet Issue category).
+  const appName = typeof body.appName === "string" ? body.appName.trim().slice(0, 120) || null : null;
   const priority = ["LOW", "MEDIUM", "HIGH", "URGENT"].includes(body.priority)
     ? body.priority
     : "MEDIUM";
@@ -209,6 +211,7 @@ export async function POST(request: NextRequest) {
           priority,
           assetTag,
           assetName,
+          appName,
           requestedById: me.id,
           requestedForId: requestedFor.id,
           status: directAssign && directTarget ? "ASSIGNED" : "OPEN",

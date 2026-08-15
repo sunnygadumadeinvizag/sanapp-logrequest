@@ -83,6 +83,9 @@ export function NewRequestForm({
   // Inventory app); its section & sub-category are selected automatically so
   // the section's POC queue takes care of the request.
   const [assetTag, setAssetTag] = useState(initialAsset?.tag ?? "");
+  // Intranet Issue category: which application the issue is about.
+  const isIntranetIssue = cat?.id === "seed-intranet-issue";
+  const [appName, setAppName] = useState("");
   const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]/g, "");
   const matchCat = (name: string | null) =>
     eligibleCats.find(
@@ -161,6 +164,7 @@ export function NewRequestForm({
           againstUsername: againstUsername || undefined,
           assetTag: assetTag || undefined,
           assetName: myAssets.find((a) => a.tag === assetTag)?.name || undefined,
+          appName: isIntranetIssue ? appName.trim() || undefined : undefined,
         }),
       });
       const data = await res.json();
@@ -247,6 +251,21 @@ export function NewRequestForm({
           Pick an asset issued to you — its section and sub-category are selected automatically, and the section&apos;s POC takes care of the request.
         </p>
       </div>
+
+      {isIntranetIssue && (
+        <div className="space-y-1.5">
+          <Label htmlFor="appName">Application (which app has the issue?)</Label>
+          <Input
+            id="appName"
+            placeholder="e.g. Academic ERP, Facilities, Log Request…"
+            value={appName}
+            onChange={(e) => setAppName(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            Tell us which intranet application the issue is about — the Intranet Issue POC will take care of it.
+          </p>
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-1.5">
