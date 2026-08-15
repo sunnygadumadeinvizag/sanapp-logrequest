@@ -52,6 +52,8 @@ export function serializeRequest(r: any) {
     closedAt: r.closedAt ? r.closedAt.toISOString() : null,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
+    assetTag: r.assetTag ?? null,
+    assetName: r.assetName ?? null,
     category: r.category ? { id: r.category.id, name: r.category.name } : null,
     subCategory: r.subCategory ? { id: r.subCategory.id, name: r.subCategory.name } : null,
     requestedBy: r.requestedBy ? { id: r.requestedBy.id, username: r.requestedBy.username, name: r.requestedBy.name } : null,

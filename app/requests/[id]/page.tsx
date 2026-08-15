@@ -161,6 +161,16 @@ export default async function RequestDetailPage({
         </div>
       )}
 
+      {r.assetTag && (
+        <div className="mb-4 rounded-lg border bg-card p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Against asset</p>
+          <p className="mt-0.5 text-sm">
+            <span className="font-semibold text-primary">{r.assetTag}</span>
+            {r.assetName ? ` — ${r.assetName}` : ""}
+          </p>
+        </div>
+      )}
+
       <RequestDetailClient
         data={{
           request: {
@@ -173,6 +183,8 @@ export default async function RequestDetailPage({
             assignedPoc: r.assignedPoc
               ? { name: r.assignedPoc.name, username: r.assignedPoc.username }
               : null,
+            assetTag: r.assetTag ?? null,
+            assetName: r.assetName ?? null,
           },
           comments: r.comments.map((c) => ({
             id: c.id,

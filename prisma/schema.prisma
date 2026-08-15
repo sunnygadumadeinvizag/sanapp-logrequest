@@ -143,6 +143,11 @@ model Request {
   location        String?
   contactTime     String? // preferred time window to contact
   contactPhone    String? // phone number for more information
+  // Optional reference to an asset from the Inventory & Asset Tracking app
+  // (same database, dedicated "inventory" schema). The request is then handled
+  // by the POC queue of the section/category the asset belongs to.
+  assetTag        String? // e.g. IIPE-IT-0001
+  assetName       String? // asset display name
   // Who raised it, and who it is for (on-behalf requests created by POCs).
   requestedById   String
   requestedBy     AppUser         @relation("Requester", fields: [requestedById], references: [id], onDelete: Cascade)

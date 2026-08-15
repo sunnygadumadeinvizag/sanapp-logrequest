@@ -57,6 +57,8 @@ export type DetailData = {
     totalWorkMinutes: number;
     directAssign?: boolean;
     assignedPoc: { name: string; username: string } | null;
+    assetTag?: string | null;
+    assetName?: string | null;
   };
   comments: { id: string; body: string; readByMe: boolean; user: { name: string; username: string }; createdAt: string }[];
   attachments: { id: string; name: string; mime: string; size: number }[];
@@ -426,6 +428,12 @@ export function RequestDetailClient({
         <Badge variant="secondary">{PRIORITY_LABELS[request.priority] ?? request.priority}</Badge>
         {request.assignedPoc && (
           <Badge variant="outline">{request.directAssign ? "Assigned to" : "POC"}: {request.assignedPoc.name}</Badge>
+        )}
+        {request.assetTag && (
+          <Badge variant="outline" title={request.assetName ?? undefined}>
+            📦 {request.assetTag}
+            {request.assetName ? ` — ${request.assetName}` : ""}
+          </Badge>
         )}
         <span className="text-xs text-muted-foreground">
           Work logged: {fmtMinutes(request.totalWorkMinutes)}

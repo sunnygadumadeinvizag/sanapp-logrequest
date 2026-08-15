@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiPath } from "sanapp-common-ui";
 import { PRIORITY_LABELS } from "@/lib/labels";
@@ -28,16 +28,30 @@ type Cat = {
   }[];
 };
 
+export type MyAssetOption = {
+  id: string;
+  tag: string;
+  name: string;
+  section: string | null;
+  category: string | null;
+  location: string | null;
+  status: string;
+};
+
 export function NewRequestForm({
   categories,
   me,
   initialCategory,
   ssoUsers,
+  myAssets = [],
+  initialAsset = null,
 }: {
   categories: Cat[];
   me: { username: string; name: string; role: string };
   initialCategory: string;
   ssoUsers: { username: string; name: string; primaryRole: string }[];
+  myAssets?: MyAssetOption[];
+  initialAsset?: MyAssetOption | null;
 }) {
   const router = useRouter();
   const eligibleCats = useMemo(() => categories.filter((c) => c.eligible), [categories]);
@@ -64,6 +78,47 @@ export function NewRequestForm({
   // Direct-assign: raised against a specific person (sub-category overrides).
   const directAssign = sub ? sub.directAssign : (cat?.directAssign ?? false);
   const isPoc = me.role === "POC" || me.role === "ADMIN";
+
+  // "Against my asset" — pick one of the assets issued to me (from the
+  // Inventory app); its section & sub-category are selected automatically so
+  // the section's POC queue takes care of the request.
+  const [assetTag, setAssetTag] = useState(initialAsset?.tag ?? "");
+  const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const matchCat = (name: string | null) =>
+    eligibleCats.find(
+      (c) => !!name && (norm(c.name) === norm(name) || norm(c.name).includes(norm(name)) || norm(name).includes(norm(c.name)))
+    );
+  const matchSub = (catSel: Cat, name: string | null) =>
+    catSel.subCategories.find(
+      (s) => !!name && (norm(s.name) === norm(name) || norm(s.name).includes(norm(name)) || norm(name).includes(norm(s.name)))
+    );
+
+  function applyAsset(asset: MyAssetOption) {
+    const catSel = asset.section ? matchCat(asset.section) : undefined;
+    if (catSel) {
+      setCategoryId(catSel.id);
+      setSubCategoryId("");
+      const subSel = asset.category ? matchSub(catSel, asset.category) : undefined;
+      if (subSel) setSubCategoryId(subSel.id);
+    }
+    if (asset.location && !location.trim()) setLocation(asset.location);
+  }
+
+  const appliedAssetRef = useRef(false);
+  useEffect(() => {
+    if (initialAsset && !appliedAssetRef.current) {
+      appliedAssetRef.current = true;
+      setAssetTag(initialAsset.tag);
+      applyAsset(initialAsset);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialAsset]);
+
+  function pickAsset(tag: string) {
+    setAssetTag(tag);
+    const asset = myAssets.find((a) => a.tag === tag);
+    if (asset) applyAsset(asset);
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -104,6 +159,8 @@ export function NewRequestForm({
           contactPhone: contactPhone.trim() || undefined,
           forUsername: forUsername || undefined,
           againstUsername: againstUsername || undefined,
+          assetTag: assetTag || undefined,
+          assetName: myAssets.find((a) => a.tag === assetTag)?.name || undefined,
         }),
       });
       const data = await res.json();
@@ -169,6 +226,26 @@ export function NewRequestForm({
             ))}
           </select>
         </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="asset">Against my asset (optional)</Label>
+        <select
+          id="asset"
+          className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+          value={assetTag}
+          onChange={(e) => pickAsset(e.target.value)}
+        >
+          <option value="">— no asset —</option>
+          {myAssets.map((a) => (
+            <option key={a.id} value={a.tag}>
+              {a.tag} — {a.name}{a.section ? ` (${a.section})` : ""}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-muted-foreground">
+          Pick an asset issued to you — its section and sub-category are selected automatically, and the section&apos;s POC takes care of the request.
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">

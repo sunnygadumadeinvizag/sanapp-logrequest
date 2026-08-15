@@ -2,16 +2,23 @@ import { currentUser, listSsoUsers } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AppShell } from "@app/components/AppShell";
 import { NewRequestForm } from "@app/components/NewRequestForm";
+import { findMyAsset, listMyAssets } from "@/lib/assets";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewRequestPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string }>;
+  searchParams: Promise<{ category?: string; assetTag?: string }>;
 }) {
   const me = await currentUser();
   const sp = await searchParams;
+  // Assets issued to this user (Inventory app, shared database). Selecting one
+  // auto-fills the section/sub-category so the right POC queue handles it.
+  const [myAssets, initialAsset] = await Promise.all([
+    me ? listMyAssets(me.username, me.name) : Promise.resolve([]),
+    me && sp.assetTag ? findMyAsset(me.username, me.name, sp.assetTag) : Promise.resolve(null),
+  ]);
 
   const categories = await prisma.category.findMany({
     where: { active: true },
@@ -69,6 +76,8 @@ export default async function NewRequestPage({
           }}
           initialCategory={sp.category ?? ""}
           ssoUsers={ssoUsers.map((u) => ({ username: u.username, name: u.name, primaryRole: u.primaryRole }))}
+          myAssets={myAssets.map((a) => ({ ...a }))}
+          initialAsset={initialAsset}
         />
       </div>
     </AppShell>

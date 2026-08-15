@@ -110,6 +110,9 @@ export async function POST(request: NextRequest) {
   const location = typeof body.location === "string" ? body.location.trim() || null : null;
   const contactTime = typeof body.contactTime === "string" ? body.contactTime.trim() || null : null;
   const contactPhone = typeof body.contactPhone === "string" ? body.contactPhone.trim() || null : null;
+  // Optional reference to an asset from the Inventory app (shared database).
+  const assetTag = typeof body.assetTag === "string" ? body.assetTag.trim().slice(0, 64) || null : null;
+  const assetName = typeof body.assetName === "string" ? body.assetName.trim().slice(0, 255) || null : null;
   const priority = ["LOW", "MEDIUM", "HIGH", "URGENT"].includes(body.priority)
     ? body.priority
     : "MEDIUM";
@@ -204,6 +207,8 @@ export async function POST(request: NextRequest) {
           contactTime,
           contactPhone,
           priority,
+          assetTag,
+          assetName,
           requestedById: me.id,
           requestedForId: requestedFor.id,
           status: directAssign && directTarget ? "ASSIGNED" : "OPEN",
