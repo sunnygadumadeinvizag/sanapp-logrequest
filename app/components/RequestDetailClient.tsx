@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DateTimePicker } from "./DateTimePicker";
 import {
   Dialog,
   DialogContent,
@@ -740,18 +741,16 @@ export function RequestDetailClient({
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div className="space-y-1">
                     <Label className="text-xs">From</Label>
-                    <Input
-                      type="datetime-local"
+                    <DateTimePicker
                       value={e.from}
-                      onChange={(ev) => setLogEntries((es) => es.map((x, j) => (j === i ? { ...x, from: ev.target.value } : x)))}
+                      onChange={(v) => setLogEntries((es) => es.map((x, j) => (j === i ? { ...x, from: v } : x)))}
                     />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">To</Label>
-                    <Input
-                      type="datetime-local"
+                    <DateTimePicker
                       value={e.to}
-                      onChange={(ev) => setLogEntries((es) => es.map((x, j) => (j === i ? { ...x, to: ev.target.value } : x)))}
+                      onChange={(v) => setLogEntries((es) => es.map((x, j) => (j === i ? { ...x, to: v } : x)))}
                     />
                   </div>
                 </div>
