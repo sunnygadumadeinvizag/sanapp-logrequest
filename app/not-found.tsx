@@ -19,7 +19,7 @@ function NotFoundBody() {
         <a className="iipe-btn" href={apiPath("/")}>
           Back to Dashboard
         </a>
-        <a className="iipe-btn secondary" href={`${MAIN_BASE_URL}/my-apps`}>
+        <a className="iipe-btn secondary" href={MAIN_BASE_URL}>
           Open My Apps
         </a>
       </div>

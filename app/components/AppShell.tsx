@@ -98,7 +98,7 @@ export async function AppShell({
         }),
         right: (
           <>
-            <AppsMenu launcherHref={`${MAIN_BASE_URL}/my-apps`} />
+            <AppsMenu launcherHref={MAIN_BASE_URL} />
             <Notifications
               items={latest.map((n) => ({
                 id: n.id,
@@ -114,7 +114,6 @@ export async function AppShell({
               signOutHref="/api/logout"
             >
               <a href={`${SSO_BASE_URL}/account`}>My Account</a>
-              <a href={`${MAIN_BASE_URL}/my-apps`}>My Apps</a>
               {isSuperAdmin && (
                 <>
                   <div className="iipe-dropdown-section">Admin Console</div>
