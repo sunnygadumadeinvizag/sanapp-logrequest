@@ -2,6 +2,9 @@ import { cookies } from "next/headers";
 import { verifyAppSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { fmtRequestNumber, fmtIstDateTime } from "@/lib/labels";
+import { pushAppNotifications } from "sanapp-common-ui";
+
+const MAIN_BASE_URL = process.env.MAIN_BASE_URL ?? "http://localhost:3001";
 
 /** Current local user, or null when not signed in. */
 export async function sessionUser() {
@@ -13,8 +16,10 @@ export async function sessionUser() {
 }
 
 /**
- * Create on-screen notifications for a list of users (deduplicated, skips the
- * actor). Never throws — notifications are best-effort.
+ * Push on-screen notifications for a list of users via the central hub in
+ * sanapp-main (deduplicated; best-effort, never throws). Local user ids are
+ * resolved to SSO usernames; links deep-link into this app's request page so
+ * they work from any application's notification bell.
  */
 export async function notify(
   userIds: string[],
@@ -24,12 +29,28 @@ export async function notify(
   requestId?: string
 ) {
   const seen = new Set<string>();
-  const rows = userIds
-    .filter((id) => id && !seen.has(id) && seen.add(id))
-    .map((userId) => ({ userId, kind, title, body, requestId }));
-  if (rows.length === 0) return;
+  const ids = userIds.filter((id) => id && !seen.has(id) && seen.add(id));
+  if (ids.length === 0) return;
   try {
-    await prisma.notification.createMany({ data: rows });
+    const users = await prisma.appUser.findMany({
+      where: { id: { in: ids } },
+      select: { username: true },
+    });
+    const items = users
+      .filter((u) => u.username)
+      .map((u) => ({
+        username: u.username,
+        title,
+        body,
+        href: requestId ? `${process.env.APP_BASE_URL ?? ""}/requests/${requestId}` : null,
+      }));
+    if (items.length === 0) return;
+    await pushAppNotifications({
+      mainBaseUrl: MAIN_BASE_URL,
+      appKey: process.env.MAIN_API_KEY,
+      basePath: process.env.BASE_PATH ?? "/logrequest",
+      items,
+    });
   } catch (e) {
     console.error("notify failed:", e);
   }

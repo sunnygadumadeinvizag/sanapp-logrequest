@@ -1,50 +1,50 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { sessionUser } from "@/lib/requests";
+import { cookies } from "next/headers";
+import { SESSION_COOKIE, verifyAppSession } from "@/lib/session";
+import { markAppNotificationsRead, queryAppNotifications } from "sanapp-common-ui";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/notifications?unread=1&page= — the current user's notifications.
+const MAIN_BASE_URL = process.env.MAIN_BASE_URL ?? "http://localhost:3001";
+const MAIN_API_KEY = process.env.MAIN_API_KEY;
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || process.env.BASE_PATH || "";
+
+/**
+ * GET — the signed-in user's notifications from the central hub (sanapp-main).
+ * Default (scope=all) powers the header bell with EVERY application's
+ * notifications, grouped by app; ?scope=app returns only what THIS app pushed
+ * (its "App Notifications" page).
+ */
 export async function GET(request: NextRequest) {
-  const me = await sessionUser();
-  if (!me) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const store = await cookies();
+  const token = store.get(SESSION_COOKIE)?.value;
+  const user = token ? await verifyAppSession(token) : null;
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const sp = request.nextUrl.searchParams;
-  const onlyUnread = sp.get("unread") === "1";
-  const page = Math.max(1, Number(sp.get("page") ?? "1"));
-  const limit = Math.min(50, Math.max(5, Number(sp.get("limit") ?? "15")));
-
-  const where = { userId: me.id, ...(onlyUnread ? { read: false } : {}) };
-  const [rows, total] = await Promise.all([
-    prisma.notification.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * limit,
-      take: limit,
-    }),
-    prisma.notification.count({ where }),
-  ]);
-
-  return NextResponse.json({
-    notifications: rows.map((n) => ({
-      id: n.id,
-      title: n.title,
-      body: n.body,
-      kind: n.kind,
-      read: n.read,
-      requestId: n.requestId,
-      createdAt: n.createdAt.toISOString(),
-    })),
-    total,
-    page,
-    limit,
+  const list = await queryAppNotifications({
+    mainBaseUrl: MAIN_BASE_URL,
+    appKey: MAIN_API_KEY,
+    username: user.username,
+    scope: sp.get("scope") === "app" ? "app" : "all",
+    basePath: BASE_PATH,
+    unreadOnly: sp.get("unread") === "1",
+    limit: Number(sp.get("limit") ?? "30"),
+    page: Number(sp.get("page") ?? "1"),
   });
+  return NextResponse.json(list);
 }
 
-// POST /api/notifications — { markAllRead: true } marks everything read.
+/**
+ * POST — mark the user's notifications read: { ids?: string[], all?: boolean }.
+ * "all" is scoped to this application so an app's page never clears other
+ * apps' notifications.
+ */
 export async function POST(request: NextRequest) {
-  const me = await sessionUser();
-  if (!me) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const store = await cookies();
+  const token = store.get(SESSION_COOKIE)?.value;
+  const user = token ? await verifyAppSession(token) : null;
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   let body: any;
   try {
@@ -52,8 +52,13 @@ export async function POST(request: NextRequest) {
   } catch {
     body = {};
   }
-  if (body.markAllRead) {
-    await prisma.notification.updateMany({ where: { userId: me.id, read: false }, data: { read: true } });
-  }
+  await markAppNotificationsRead({
+    mainBaseUrl: MAIN_BASE_URL,
+    appKey: MAIN_API_KEY,
+    username: user.username,
+    ids: Array.isArray(body?.ids) ? body.ids : undefined,
+    all: body?.all === true,
+    basePath: BASE_PATH,
+  });
   return NextResponse.json({ ok: true });
 }

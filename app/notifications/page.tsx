@@ -1,6 +1,6 @@
 import { currentUser } from "@/lib/auth";
 import { AppShell } from "@app/components/AppShell";
-import { NotificationsClient } from "@app/components/NotificationsClient";
+import { AppNotificationsView, Breadcrumb } from "sanapp-common-ui";
 
 export const dynamic = "force-dynamic";
 
@@ -20,12 +20,14 @@ export default async function NotificationsPage() {
       active="notifications"
       sidebarItems={[]}
     >
-      <h1 className="iipe-page-title">Notifications</h1>
+      <Breadcrumb items={[{ label: "Dashboard", href: "/" }, { label: "App Notifications" }]} />
+      <h1 className="iipe-page-title">App Notifications</h1>
       <p className="iipe-page-sub">
-        On-screen alerts when your requests are assigned, moved, commented on or closed.
+        Alerts from Log Request — assignments, status changes and comments on your requests.
+        Notifications from every application also appear under the bell in the header.
       </p>
-      <div className="mt-4 max-w-2xl">
-        <NotificationsClient />
+      <div className="mt-4">
+        <AppNotificationsView appName="Log Request" />
       </div>
     </AppShell>
   );

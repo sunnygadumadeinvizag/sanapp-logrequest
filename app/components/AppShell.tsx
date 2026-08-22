@@ -2,11 +2,10 @@ import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import {
   AppsMenu,
-  apiPath,
   getPlatformNav,
   lookupAppName,
-  Notifications,
   PageShell,
+  queryAppNotifications,
   SessionGuard,
   UserMenu,
 } from "sanapp-common-ui";
@@ -47,15 +46,18 @@ export async function AppShell({
     "USER";
   const isSuperAdmin = ssoRole === "SUPER_ADMIN";
   const local = await prisma.appUser.findUnique({ where: { username: me.username } });
-  const userId = local?.id ?? "";
-  const unreadCount = userId ? await prisma.notification.count({ where: { userId, read: false } }) : 0;
-  const latest = userId
-    ? await prisma.notification.findMany({
-        where: { userId },
-        orderBy: { createdAt: "desc" },
-        take: 5,
+  // Unread count from the central hub in Main (scoped to this app's pushes).
+  const unread = local
+    ? await queryAppNotifications({
+        mainBaseUrl: MAIN_BASE_URL,
+        appKey: process.env.MAIN_API_KEY,
+        username: me.username,
+        scope: "app",
+        unreadOnly: true,
+        limit: 1,
       })
-    : [];
+    : null;
+  const unreadCount = unread?.unread ?? 0;
 
   const isPoc = local?.role === "POC" || local?.role === "ADMIN";
 
@@ -71,7 +73,7 @@ export async function AppShell({
     );
   }
   baseItems.push({
-    label: unreadCount > 0 ? `Notifications (${unreadCount})` : "Notifications",
+    label: unreadCount > 0 ? `App Notifications (${unreadCount})` : "App Notifications",
     href: "/notifications",
     active: active === "notifications",
   });
@@ -99,14 +101,6 @@ export async function AppShell({
         right: (
           <>
             <AppsMenu launcherHref={MAIN_BASE_URL} />
-            <Notifications
-              items={latest.map((n) => ({
-                id: n.id,
-                title: n.title,
-                time: n.createdAt.toISOString(),
-                href: n.requestId ? apiPath(`/requests/${n.requestId}`) : apiPath("/notifications"),
-              }))}
-            />
             <UserMenu
               name={me.name}
               email={me.email}
