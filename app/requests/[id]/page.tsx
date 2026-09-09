@@ -88,6 +88,15 @@ export default async function RequestDetailPage({
       })
     : pocOptions.map((p) => p.user).filter((u) => u.id !== me.id);
 
+  // Co-worker candidates: any app user with an SSO primary role (except me),
+  // regardless of category POC assignments — co-workers are colleagues who
+  // help on a request, not necessarily category POCs.
+  const coworkerCandidates = await prisma.appUser.findMany({
+    where: { primaryRole: { not: null }, id: { not: me.id } },
+    select: { id: true, username: true, name: true, primaryRole: true },
+    orderBy: [{ primaryRole: "asc" }, { name: "asc" }],
+  });
+
   const session = {
     sub: me.ssoUserId ?? "",
     username: me.username,
@@ -226,6 +235,12 @@ export default async function RequestDetailPage({
         me={{ username: me.username, name: me.name }}
         role={me.role as "ADMIN" | "POC" | "USER"}
         pocOptions={otherPocs.map((u) => ({
+          id: u.id,
+          name: u.name,
+          username: u.username,
+          primaryRole: u.primaryRole ?? "",
+        }))}
+        coworkerOptions={coworkerCandidates.map((u) => ({
           id: u.id,
           name: u.name,
           username: u.username,

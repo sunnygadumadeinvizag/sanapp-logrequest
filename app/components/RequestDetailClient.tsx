@@ -93,6 +93,7 @@ export function RequestDetailClient({
   me,
   role,
   pocOptions,
+  coworkerOptions,
   workers,
   isWorker,
 }: {
@@ -100,6 +101,7 @@ export function RequestDetailClient({
   me: { username: string; name: string };
   role: "ADMIN" | "POC" | "USER";
   pocOptions: { id: string; name: string; username: string; primaryRole?: string }[];
+  coworkerOptions: { id: string; name: string; username: string; primaryRole?: string }[];
   workers: WorkerRow[];
   isWorker: boolean;
 }) {
@@ -405,10 +407,10 @@ export function RequestDetailClient({
   const roleFiltered = moveRole ? otherPocs.filter((p) => p.primaryRole === moveRole) : otherPocs;
 
   const workerRoles = Array.from(
-    new Set(pocOptions.map((p) => p.primaryRole).filter(Boolean) as string[])
+    new Set(coworkerOptions.map((p) => p.primaryRole).filter(Boolean) as string[])
   ).sort();
   const workerFiltered = workerRole
-    ? pocOptions.filter((p) => p.primaryRole === workerRole && p.username !== me.username && !workers.some((w) => w.userId === p.id))
+    ? coworkerOptions.filter((p) => p.primaryRole === workerRole && !workers.some((w) => w.userId === p.id))
     : [];
 
   function openLogDialog() {
@@ -545,9 +547,20 @@ export function RequestDetailClient({
                 </>
               )}
               {request.status === "RESOLVED" && (isPoc || isAssignee) && (
-                <Button size="sm" onClick={() => changeStatus("CLOSED")} disabled={busy}>
-                  Confirm & close
-                </Button>
+                <>
+                  <Button size="sm" onClick={() => changeStatus("CLOSED")} disabled={busy}>
+                    Confirm & close
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => changeStatus("IN_PROGRESS")}
+                    disabled={busy}
+                    title="Mark as not resolved — send it back to in progress"
+                  >
+                    Mark not resolved
+                  </Button>
+                </>
               )}
               {isAssignee && (
                 <Button size="sm" variant="outline" onClick={() => { setWorkerRole(""); setWorkerUser(""); setWorkerOpen(true); }} disabled={busy}>
