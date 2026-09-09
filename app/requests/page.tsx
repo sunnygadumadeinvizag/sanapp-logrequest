@@ -46,7 +46,7 @@ export default async function RequestsPage({
       <div className="mt-4 flex gap-1 rounded-lg border bg-card p-1 text-sm">
         <a
           href={apiPath("/requests")}
-          className={`flex-1 rounded-md px-3 py-1.5 text-center font-medium ${
+          className={`flex-1 rounded-md px-3 py-1.5 text-center font-medium no-underline hover:no-underline ${
             tab === "mine" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted/60"
           }`}
         >
@@ -54,7 +54,7 @@ export default async function RequestsPage({
         </a>
         <a
           href={apiPath("/requests?tab=assigned")}
-          className={`flex-1 rounded-md px-3 py-1.5 text-center font-medium ${
+          className={`flex-1 rounded-md px-3 py-1.5 text-center font-medium no-underline hover:no-underline ${
             tab === "assigned" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted/60"
           }`}
         >

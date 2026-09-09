@@ -125,7 +125,7 @@ export function RequestsClient({
         ) : (
           <div className="divide-y">
             {rows.map((r) => (
-              <a key={r.id} href={apiPath(`/requests/${r.id}`)} className="flex items-start justify-between gap-3 p-3 transition-colors hover:bg-muted/40">
+              <a key={r.id} href={apiPath(`/requests/${r.id}`)} className="flex items-start justify-between gap-3 p-3 no-underline transition-colors hover:bg-muted/40 hover:no-underline">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs font-semibold text-primary">{r.requestId}</span>

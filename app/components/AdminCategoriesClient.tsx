@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Select,
   SelectContent,
@@ -63,6 +64,7 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
   const [pocRole, setPocRole] = useState("");
   const [pocUsername, setPocUsername] = useState("");
   const [pocOrder, setPocOrder] = useState("1");
+  const [removePocTarget, setRemovePocTarget] = useState<string | null>(null);
 
   const flash = (ok: boolean, t: string) => {
     setMsg(ok ? t : null);
@@ -175,7 +177,6 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
   }
 
   async function removePoc(pocId: string) {
-    if (!confirm("Remove this POC assignment?")) return;
     setBusy(true);
     try {
       await fetch(apiPath(`/api/admin/pocs/${pocId}`), { method: "DELETE" });
@@ -413,7 +414,7 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
                       {c.pocs.map((p) => (
                         <div key={p.id} className="flex items-center justify-between rounded-md border px-2 py-1 text-sm">
                           <span>{p.name} <span className="text-xs text-muted-foreground">(@{p.username})</span></span>
-                          <button onClick={() => removePoc(p.id)} className="text-muted-foreground hover:text-red-600" title="Remove POC">
+                          <button onClick={() => setRemovePocTarget(p.id)} className="text-muted-foreground hover:text-red-600" title="Remove POC">
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
@@ -471,7 +472,7 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
                                 </button>
                               );
                             })}
-                                                 <button
+                            <button
                               type="button"
                               onClick={() => toggleSubDirect(c.id, s.id)}
                               disabled={busy}
@@ -480,7 +481,7 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
                             >
                               {s.directAssign ? "✓ " : ""}Direct to user
                             </button>
-     </div>
+                          </div>
                           {s.pocs.length > 0 && (
                             <div className="mt-1 flex flex-wrap gap-1">
                               {s.pocs.map((p) => (
@@ -584,6 +585,21 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Remove POC confirmation — in-app modal instead of window.confirm() */}
+      <ConfirmDialog
+        open={removePocTarget !== null}
+        onOpenChange={(o) => !o && setRemovePocTarget(null)}
+        title="Remove this POC assignment?"
+        description="They will no longer receive requests from this queue."
+        confirmLabel="Remove"
+        destructive
+        busy={busy}
+        onConfirm={async () => {
+          if (removePocTarget) await removePoc(removePocTarget);
+          setRemovePocTarget(null);
+        }}
+      />
     </div>
   );
 }

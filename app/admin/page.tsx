@@ -71,16 +71,16 @@ export default async function AdminPage() {
         <Card>
           <CardHeader><CardTitle className="text-sm">Management</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            <a href={apiPath("/admin/categories")} className="block rounded-md border p-3 text-sm font-medium hover:bg-muted/40">
+            <a href={apiPath("/admin/categories")} className="block rounded-md border p-3 text-sm font-medium no-underline hover:bg-muted/40 hover:no-underline">
               Categories &amp; POCs — who may raise requests, POC queue order
             </a>
-            <a href={apiPath("/admin/tracking")} className="block rounded-md border p-3 text-sm font-medium hover:bg-muted/40">
+            <a href={apiPath("/admin/tracking")} className="block rounded-md border p-3 text-sm font-medium no-underline hover:bg-muted/40 hover:no-underline">
               Full Tracking — filter every request, user and POC workload
             </a>
-            <a href={apiPath("/admin/analytics/users")} className="block rounded-md border p-3 text-sm font-medium hover:bg-muted/40">
+            <a href={apiPath("/admin/analytics/users")} className="block rounded-md border p-3 text-sm font-medium no-underline hover:bg-muted/40 hover:no-underline">
               Tracking: Users — who raised what, solved counts, work time
             </a>
-            <a href={apiPath("/admin/analytics/categories")} className="block rounded-md border p-3 text-sm font-medium hover:bg-muted/40">
+            <a href={apiPath("/admin/analytics/categories")} className="block rounded-md border p-3 text-sm font-medium no-underline hover:bg-muted/40 hover:no-underline">
               Tracking: Categories — raised vs solved per category and sub-category
             </a>
           </CardContent>
