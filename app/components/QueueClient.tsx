@@ -111,10 +111,16 @@ export function QueueClient({ meUsername }: { meUsername: string }) {
           </div>
         ) : (
           <div className="divide-y">
-            {waiting.map((w) => {
+            {waiting.map((w, idx) => {
               const mine = w.assignedPoc?.name ?? null;
               return (
                 <div key={w.id} className="group flex items-start justify-between gap-3 p-3 transition-colors hover:bg-muted/40">
+                  <span
+                    className="mt-0.5 w-6 shrink-0 text-xs font-semibold text-muted-foreground"
+                    title="Position in the queue"
+                  >
+                    #{idx + 1}
+                  </span>
                   <a href={apiPath(`/requests/${w.id}`)} className="min-w-0 flex-1 cursor-pointer">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs font-semibold text-primary">{w.requestId}</span>

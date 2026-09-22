@@ -5,6 +5,7 @@ import { AppShell } from "@app/components/AppShell";
 import { RequestDetailClient } from "@app/components/RequestDetailClient";
 import { Breadcrumb } from "sanapp-common-ui";
 import { fmtIstDateTime } from "@/lib/labels";
+import { queueSlotsFor } from "@/lib/requests";
 import { Badge } from "@/components/ui/badge";
 
 export const dynamic = "force-dynamic";
@@ -66,6 +67,10 @@ export default async function RequestDetailPage({
     r.assignedPocId === me.id ||
     r.workers.some((w) => w.userId === me.id);
   if (!canView) notFound();
+
+  // Its place in the queue while nobody has taken it (same category +
+  // sub-category, oldest first) — rendered as "Waiting in queue — 3 of 7".
+  const queueSlot = (await queueSlotsFor([r])).get(r.id) ?? null;
 
   // POC options for "move to another POC". The assigner picks a primary
   // role (SSO role) first, then a person by name — the platform role
@@ -201,6 +206,7 @@ export default async function RequestDetailPage({
             assignedPoc: r.assignedPoc
               ? { name: r.assignedPoc.name, username: r.assignedPoc.username }
               : null,
+            queue: queueSlot,
             assetTag: r.assetTag ?? null,
             assetName: r.assetName ?? null,
             appName: r.appName ?? null,

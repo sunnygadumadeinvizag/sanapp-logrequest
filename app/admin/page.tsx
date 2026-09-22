@@ -83,6 +83,9 @@ export default async function AdminPage() {
             <a href={apiPath("/admin/analytics/categories")} className="block rounded-md border p-3 text-sm font-medium no-underline hover:bg-muted/40 hover:no-underline">
               Tracking: Categories — raised vs solved per category and sub-category
             </a>
+            <a href={apiPath("/admin/tasks")} className="block rounded-md border p-3 text-sm font-medium no-underline hover:bg-muted/40 hover:no-underline">
+              Task Oversight — recurring tasks, due/missed/completed across all users
+            </a>
           </CardContent>
         </Card>
       </div>

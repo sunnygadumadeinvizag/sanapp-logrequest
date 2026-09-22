@@ -86,4 +86,54 @@ export function serializeRequest(r: any) {
   };
 }
 
+export type QueueSlot = { position: number; total: number };
+
+/**
+ * Where each still-unassigned request sits in its queue — "3 of 7" — counted
+ * over the requests waiting in the same place (same category + sub-category,
+ * oldest first), which is the order a POC takes them in. Requests a POC has
+ * already taken get no entry.
+ *
+ * Takes the rows a page already loaded and runs one query per distinct queue,
+ * so a 10-row list costs a couple of queries, not one per row.
+ */
+export async function queueSlotsFor(
+  rows: {
+    id: string;
+    categoryId?: string | null;
+    subCategoryId?: string | null;
+    assignedPocId?: string | null;
+    status?: string;
+  }[]
+): Promise<Map<string, QueueSlot>> {
+  const slots = new Map<string, QueueSlot>();
+  const queues = new Map<string, { categoryId: string; subCategoryId: string | null }>();
+
+  for (const row of rows) {
+    if (row.assignedPocId || row.status !== "OPEN" || !row.categoryId) continue;
+    const key = `${row.categoryId}::${row.subCategoryId ?? ""}`;
+    if (!queues.has(key)) {
+      queues.set(key, { categoryId: row.categoryId, subCategoryId: row.subCategoryId ?? null });
+    }
+  }
+
+  await Promise.all(
+    [...queues.values()].map(async (queue) => {
+      const waiting = await prisma.request.findMany({
+        where: {
+          status: "OPEN",
+          assignedPocId: null,
+          categoryId: queue.categoryId,
+          subCategoryId: queue.subCategoryId,
+        },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        select: { id: true },
+      });
+      waiting.forEach((w, i) => slots.set(w.id, { position: i + 1, total: waiting.length }));
+    })
+  );
+
+  return slots;
+}
+
 export { fmtRequestNumber, fmtIstDateTime };

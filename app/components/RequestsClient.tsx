@@ -21,6 +21,7 @@ type Req = {
   requestedBy: { name: string } | null;
   requestedFor: { name: string } | null;
   assignedPoc: { name: string } | null;
+  queue?: { position: number; total: number } | null;
 };
 
 export function RequestsClient({
@@ -136,7 +137,11 @@ export function RequestsClient({
                   <p className="mt-1 truncate text-sm font-medium">{r.title}</p>
                   <p className="text-xs text-muted-foreground">
                     Raised by {r.requestedBy?.name ?? "—"} · {new Date(r.createdAt).toLocaleDateString("en-IN")}
-                    {r.assignedPoc ? ` · POC: ${r.assignedPoc.name}` : ""}
+                    {r.assignedPoc
+                      ? ` · POC: ${r.assignedPoc.name}`
+                      : r.queue
+                        ? ` · Waiting in queue — #${r.queue.position} of ${r.queue.total}`
+                        : ""}
                   </p>
                 </div>
               </a>

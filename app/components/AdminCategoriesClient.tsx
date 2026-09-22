@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   Select,
   SelectContent,
@@ -65,6 +66,9 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
   const [pocUsername, setPocUsername] = useState("");
   const [pocOrder, setPocOrder] = useState("1");
   const [removePocTarget, setRemovePocTarget] = useState<string | null>(null);
+  // New category / sub-category name — in-app modal instead of window.prompt().
+  const [nameDialog, setNameDialog] = useState<{ kind: "category" | "sub"; catId?: string } | null>(null);
+  const [nameValue, setNameValue] = useState("");
 
   const flash = (ok: boolean, t: string) => {
     setMsg(ok ? t : null);
@@ -97,9 +101,9 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
     }
   }, []);
 
-  async function addCategory() {
-    const name = prompt("New category name:");
-    if (!name?.trim()) return;
+  async function addCategory(rawName: string) {
+    const name = rawName.trim();
+    if (!name) return;
     setBusy(true);
     try {
       const res = await fetch(apiPath("/api/categories"), {
@@ -120,9 +124,9 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
     }
   }
 
-  async function addSub(catId: string) {
-    const name = prompt("New sub-category name:");
-    if (!name?.trim()) return;
+  async function addSub(catId: string, rawName: string) {
+    const name = rawName.trim();
+    if (!name) return;
     const cat = cats.find((c) => c.id === catId);
     await save(catId, {
       subCategories: [
@@ -139,6 +143,22 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
     });
     const r = await fetch(apiPath("/api/categories"), { cache: "no-store" });
     setCats((await r.json()).categories);
+  }
+
+  /** Open the name dialog — for a new category (no catId) or a new sub-category (with catId). */
+  function openNameDialog(kind: "category" | "sub", catId?: string) {
+    setNameValue("");
+    setNameDialog({ kind, catId });
+  }
+
+  /** Creates the category/sub-category, keeping the dialog open (with a spinner) while pending. */
+  async function submitName() {
+    const target = nameDialog;
+    const name = nameValue.trim();
+    if (!target || !name || busy) return;
+    if (target.kind === "category") await addCategory(name);
+    else if (target.catId) await addSub(target.catId, name);
+    setNameDialog(null);
   }
 
   function openAssignPoc(catId: string, subId: string | null) {
@@ -300,7 +320,7 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
         </div>
       )}
 
-      <Button size="sm" onClick={addCategory} disabled={busy}>
+      <Button size="sm" onClick={() => openNameDialog("category")} disabled={busy}>
         <Plus className="mr-1 h-4 w-4" /> Add category
       </Button>
 
@@ -493,7 +513,7 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
                           )}
                         </div>
                       ))}
-                      <Button variant="outline" size="sm" onClick={() => addSub(c.id)} disabled={busy}>
+                      <Button variant="outline" size="sm" onClick={() => openNameDialog("sub", c.id)} disabled={busy}>
                         <Plus className="mr-1 h-3 w-3" /> Add sub-category
                       </Button>
                     </div>
@@ -542,19 +562,19 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
             <div className="space-y-2">
               <Label htmlFor="poc-user">Person by name</Label>
               {ssoUsers.length > 0 ? (
-                <Select value={pocUsername || undefined} onValueChange={setPocUsername}>
-                  <SelectTrigger id="poc-user">
-                    <SelectValue placeholder={pocRole ? "Select a person" : "Choose a primary role first"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {assignableUsers.length === 0 && (
-                      <div className="px-3 py-2 text-xs text-muted-foreground">No users found for this role</div>
-                    )}
-                    {assignableUsers.map((u) => (
-                      <SelectItem key={u.username} value={u.username}>{u.name} ({u.username})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  id="poc-user"
+                  value={pocUsername}
+                  onValueChange={setPocUsername}
+                  options={assignableUsers.map((u) => ({
+                    value: u.username,
+                    label: `${u.name} (${u.username})`,
+                    keywords: u.primaryRole,
+                  }))}
+                  placeholder={pocRole ? "Select a person" : "Choose a primary role first"}
+                  searchPlaceholder="Type a name or username…"
+                  emptyText={pocRole ? "No users found for this role" : "Choose a primary role first"}
+                />
               ) : (
                 <Input
                   id="poc-user"
@@ -600,6 +620,49 @@ export function AdminCategoriesClient({ initialCategories, ssoUsers }: { initial
           setRemovePocTarget(null);
         }}
       />
+
+      {/* New category / sub-category name — in-app modal instead of window.prompt() */}
+      <Dialog
+        open={nameDialog !== null}
+        onOpenChange={(o) => {
+          if (!o && !busy) setNameDialog(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md" onInteractOutside={(e) => busy && e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle>{nameDialog?.kind === "sub" ? "New sub-category" : "New category"}</DialogTitle>
+            <DialogDescription>
+              {nameDialog?.kind === "sub"
+                ? "Added under this category. You can rename, reorder or switch it off later."
+                : "Shown to users when they raise a request. You choose which primary roles may use it below."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="new-name">Name</Label>
+            <Input
+              id="new-name"
+              autoFocus
+              placeholder={nameDialog?.kind === "sub" ? "e.g. Plumbing" : "e.g. IT Hardware"}
+              value={nameValue}
+              onChange={(e) => setNameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void submitName();
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNameDialog(null)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button onClick={submitName} disabled={busy || !nameValue.trim()}>
+              {busy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Plus className="mr-1 h-3 w-3" />} Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

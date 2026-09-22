@@ -81,6 +81,10 @@ export async function POST(request: NextRequest) {
   const name = String(body.name ?? "").trim();
   if (!name) return NextResponse.json({ error: "missing_name" }, { status: 400 });
 
+  // Every category offers an "Others" sub-category, so a request that fits no
+  // sub-category can still be raised and routed to that queue's own POCs.
+  const OTHERS_SUB_CATEGORY = "Others";
+
   const allowedRoles: string[] = Array.isArray(body.allowedRoles) ? body.allowedRoles : [];
   const cat = await prisma.category.create({
     data: {
@@ -94,5 +98,12 @@ export async function POST(request: NextRequest) {
       order: (await prisma.category.count()) + 1,
     },
   });
+
+  // The category is brand new, so this cannot collide; the catch only guards a
+  // concurrent create of the same sub-category name.
+  await prisma.subCategory
+    .create({ data: { categoryId: cat.id, name: OTHERS_SUB_CATEGORY, order: 1 } })
+    .catch(() => null);
+
   return NextResponse.json({ category: cat }, { status: 201 });
 }

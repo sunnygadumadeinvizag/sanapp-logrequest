@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sessionUser, serializeRequest, notify, fmtRequestNumber } from "@/lib/requests";
+import { sessionUser, serializeRequest, notify, fmtRequestNumber, queueSlotsFor } from "@/lib/requests";
 import { listSsoUsers } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -83,8 +83,12 @@ export async function GET(request: NextRequest) {
     prisma.request.count({ where }),
   ]);
 
+  // Where each not-yet-taken request sits in its queue, so the person who
+  // raised it sees "3 of 7" instead of nothing while it waits for a POC.
+  const slots = await queueSlotsFor(rows);
+
   return NextResponse.json({
-    requests: rows.map(serializeRequest),
+    requests: rows.map((r) => ({ ...serializeRequest(r), queue: slots.get(r.id) ?? null })),
     total,
     page,
     limit,

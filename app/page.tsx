@@ -6,6 +6,7 @@ import { apiPath } from "sanapp-common-ui";
 import { fmtRequestNumber, statusLabel, priorityLabel, fmtMinutes } from "@/lib/labels";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { syncTaskLogs, periodKeyFor } from "@/lib/tasks";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export default async function DashboardPage() {
 
   const isPoc = me.role === "POC" || me.role === "ADMIN";
 
-  const [myOpen, myTotal, unread, queueCount, recent, running] = await Promise.all([
+  const [myOpen, myTotal, unread, queueCount, recent, running, dueTasks] = await Promise.all([
     prisma.request.count({
       where: { requestedById: me.id, status: { notIn: ["CLOSED", "CANCELLED"] } },
     }),
@@ -50,6 +51,21 @@ export default async function DashboardPage() {
       where: { pocId: me.id, endedAt: null },
       include: { request: { select: { id: true, number: true, title: true } } },
     }),
+    (async () => {
+      // (Reminders are pushed once per period by AppShell → sendDueReminders.)
+      await syncTaskLogs(me.id);
+      const ts = await prisma.recurringTask.findMany({
+        where: { userId: me.id, active: true },
+        include: { logs: { orderBy: { periodKey: "desc" }, take: 3 } },
+      });
+      return ts
+        .map((t) => {
+          const cur = periodKeyFor(t.recurrence as any);
+          const current = t.logs.find((l) => l.periodKey === cur) ?? null;
+          return { task: t, current };
+        })
+        .filter((x) => x.current && (x.current.status === "PENDING" || x.current.status === "MISSED"));
+    })(),
   ]);
 
   const categories = await prisma.category.findMany({
@@ -93,6 +109,36 @@ export default async function DashboardPage() {
         </div>
       )}
 
+      {dueTasks.length > 0 && (
+        <div className="mt-4 rounded-md border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <strong className="text-amber-900">
+              {dueTasks.length} recurring task{dueTasks.length === 1 ? "" : "s"} need{dueTasks.length === 1 ? "s" : ""} attention
+            </strong>
+            <a href={apiPath("/tasks")} className="font-semibold text-amber-900 underline">
+              Open My Tasks →
+            </a>
+          </div>
+          <ul className="mt-2 space-y-1">
+            {dueTasks.slice(0, 5).map(({ task, current }) => (
+              <li key={task.id} className="flex flex-wrap items-center gap-2 text-amber-900">
+                <span
+                  className={`inline-block h-2 w-2 rounded-full ${
+                    current!.status === "MISSED" ? "bg-red-500" : "bg-amber-500"
+                  }`}
+                />
+                <span className="font-medium">{task.title}</span>
+                <span className="text-xs opacity-75">
+                  {task.recurrence === "DAILY" ? "daily" : task.recurrence === "WEEKLY" ? "weekly" : "monthly"}
+                  {" · "}
+                  {current!.status === "MISSED" ? "missed" : "due now"} ({current!.periodKey})
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -104,7 +150,7 @@ export default async function DashboardPage() {
               <a
                 key={r.id}
                 href={apiPath(`/requests/${r.id}`)}
-                className="flex items-start justify-between gap-3 rounded-md border p-3 transition-colors hover:bg-muted/40"
+                className="flex items-start justify-between gap-3 rounded-md border p-3 no-underline transition-colors hover:bg-muted/40 hover:no-underline"
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">

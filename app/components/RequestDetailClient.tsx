@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -58,6 +59,7 @@ export type DetailData = {
     totalWorkMinutes: number;
     directAssign?: boolean;
     assignedPoc: { name: string; username: string } | null;
+    queue?: { position: number; total: number } | null;
     assetTag?: string | null;
     assetName?: string | null;
     appName?: string | null;
@@ -435,6 +437,11 @@ export function RequestDetailClient({
         {request.assignedPoc && (
           <Badge variant="outline">{request.directAssign ? "Assigned to" : "POC"}: {request.assignedPoc.name}</Badge>
         )}
+        {!request.assignedPoc && request.queue && (
+          <Badge variant="outline" title="Position among the requests waiting for a POC in this queue">
+            Waiting in queue — #{request.queue.position} of {request.queue.total}
+          </Badge>
+        )}
         {request.assetTag && (
           <Badge variant="outline" title={request.assetName ?? undefined}>
             📦 {request.assetTag}
@@ -517,24 +524,19 @@ export function RequestDetailClient({
                   <Button size="sm" variant="secondary" onClick={() => changeStatus("RESOLVED")} disabled={busy}>
                     Mark resolved
                   </Button>
-                  <Select
-                    value={movePoc || undefined}
+                  <SearchableSelect
+                    value={movePoc}
                     onValueChange={(v) => { setMoveRole(""); setMovePoc(v); setMoveReason(""); setMoveOpen(true); }}
-                  >
-                    <SelectTrigger className="h-8 w-52 text-xs">
-                      <SelectValue placeholder="Move to another POC…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {otherPocs.length === 0 && (
-                        <div className="px-3 py-2 text-xs text-muted-foreground">No other POCs available</div>
-                      )}
-                      {otherPocs.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name}{p.primaryRole ? ` (${p.primaryRole.replace(/_/g, " ").toLowerCase()})` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    options={otherPocs.map((p) => ({
+                      value: p.id,
+                      label: `${p.name}${p.primaryRole ? ` (${p.primaryRole.replace(/_/g, " ").toLowerCase()})` : ""}`,
+                    }))}
+                    placeholder="Move to another POC…"
+                    searchPlaceholder="Type a name…"
+                    emptyText="No other POCs available"
+                    className="h-8 w-52 text-xs"
+                    aria-label="Move to another POC"
+                  />
                   <Button
                     size="sm"
                     variant="outline"
@@ -827,19 +829,15 @@ export function RequestDetailClient({
             </div>
             <div className="space-y-2">
               <Label htmlFor="move-poc">Person by name</Label>
-              <Select value={movePoc || undefined} onValueChange={setMovePoc}>
-                <SelectTrigger id="move-poc">
-                  <SelectValue placeholder="Select a person" />
-                </SelectTrigger>
-                <SelectContent>
-                  {roleFiltered.length === 0 && (
-                    <div className="px-3 py-2 text-xs text-muted-foreground">No POCs for this role</div>
-                  )}
-                  {roleFiltered.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.name} ({p.username})</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                id="move-poc"
+                value={movePoc}
+                onValueChange={setMovePoc}
+                options={roleFiltered.map((p) => ({ value: p.id, label: `${p.name} (${p.username})` }))}
+                placeholder="Select a person"
+                searchPlaceholder="Type a name or username…"
+                emptyText="No POCs for this role"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="move-reason">Reason</Label>
@@ -894,21 +892,15 @@ export function RequestDetailClient({
             </div>
             <div className="space-y-2">
               <Label htmlFor="worker-user">Person by name</Label>
-              <Select value={workerUser || undefined} onValueChange={setWorkerUser}>
-                <SelectTrigger id="worker-user">
-                  <SelectValue placeholder={workerRole ? "Select a person" : "Choose a primary role first"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {workerFiltered.length === 0 && (
-                    <div className="px-3 py-2 text-xs text-muted-foreground">
-                      {workerRole ? "No eligible people for this role" : "Choose a primary role first"}
-                    </div>
-                  )}
-                  {workerFiltered.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.name} ({p.username})</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                id="worker-user"
+                value={workerUser}
+                onValueChange={setWorkerUser}
+                options={workerFiltered.map((p) => ({ value: p.id, label: `${p.name} (${p.username})` }))}
+                placeholder={workerRole ? "Select a person" : "Choose a primary role first"}
+                searchPlaceholder="Type a name or username…"
+                emptyText={workerRole ? "No eligible people for this role" : "Choose a primary role first"}
+              />
             </div>
           </div>
           <DialogFooter>

@@ -27,7 +27,7 @@ export async function AppShell({
   children,
 }: {
   me: AppUserSession;
-  active?: "home" | "requests" | "queue" | "my-work" | "notifications" | "admin";
+  active?: "home" | "requests" | "queue" | "my-work" | "notifications" | "tasks" | "admin";
   sidebarItems: SidebarItem[];
   children: ReactNode;
 }) {
@@ -61,6 +61,26 @@ export async function AppShell({
 
   const isPoc = local?.role === "POC" || local?.role === "ADMIN";
 
+  // Recurring-task due badge (current period still PENDING).
+  let dueCount = 0;
+  if (local) {
+    try {
+      const { sendDueReminders, periodKeyFor } = await import("@/lib/tasks");
+      // Sync the period logs and push any due/missed reminder (deduped per period).
+      await sendDueReminders(local.id);
+      const dueTasks = await prisma.recurringTask.findMany({
+        where: { userId: local.id, active: true },
+        include: { logs: { orderBy: { periodKey: "desc" }, take: 3 } },
+      });
+      dueCount = dueTasks.filter((t) => {
+        const cur = periodKeyFor(t.recurrence as any);
+        return t.logs.some((l) => l.periodKey === cur && l.status === "PENDING");
+      }).length;
+    } catch {
+      dueCount = 0;
+    }
+  }
+
   const baseItems: SidebarItem[] = [
     { label: "Dashboard", href: "/", active: active === "home" },
     { label: "My Requests", href: "/requests", active: active === "requests" },
@@ -73,6 +93,11 @@ export async function AppShell({
     );
   }
   baseItems.push({
+    label: dueCount > 0 ? `My Tasks (${dueCount} due)` : "My Tasks",
+    href: "/tasks",
+    active: active === "tasks",
+  });
+  baseItems.push({
     label: unreadCount > 0 ? `App Notifications (${unreadCount})` : "App Notifications",
     href: "/notifications",
     active: active === "notifications",
@@ -83,7 +108,8 @@ export async function AppShell({
       { label: "Categories & POCs", href: "/admin/categories" },
       { label: "Full Tracking", href: "/admin/tracking" },
       { label: "Tracking: Users", href: "/admin/analytics/users" },
-      { label: "Tracking: Categories", href: "/admin/analytics/categories" }
+      { label: "Tracking: Categories", href: "/admin/analytics/categories" },
+      { label: "Task Oversight", href: "/admin/tasks" }
     );
   }
   const items = [...baseItems, ...sidebarItems];

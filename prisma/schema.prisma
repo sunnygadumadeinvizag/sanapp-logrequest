@@ -67,6 +67,7 @@ model AppUser {
   reads         RequestCommentRead[]
   workerRequests RequestWorker[] // requests this user is an extra worker on
   addedWorkers   RequestWorker[] @relation("WorkerAddedBy")
+  recurringTasks RecurringTask[]
 }
 
 model Category {
@@ -263,6 +264,55 @@ model RequestAttachment {
 
 // On-screen notifications (never email). Created when requests are raised,
 // assigned, moved, commented on or closed.
+enum TaskRecurrence {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum TaskLogStatus {
+  PENDING
+  COMPLETED
+  MISSED
+  SKIPPED
+}
+
+model RecurringTask {
+  id              String           @id @default(uuid())
+  userId          String
+  user            AppUser          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title           String
+  description     String?
+  recurrence      TaskRecurrence
+  weekday         Int? // 0=Sun..6=Sat, used when recurrence=WEEKLY
+  dayOfMonth      Int? // 1..31, used when recurrence=MONTHLY
+  reminderEnabled Boolean          @default(true)
+  reminderTime    String? // IST "HH:MM" — when the reminder is pushed; null = 09:00
+  active          Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  logs            RecurringTaskLog[]
+  @@index([userId, active])
+}
+
+model RecurringTaskLog {
+  id       String          @id @default(uuid())
+  taskId   String
+  task     RecurringTask   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  periodKey String // DAILY: YYYY-MM-DD, WEEKLY: week-start YYYY-MM-DD, MONTHLY: YYYY-MM
+  status   TaskLogStatus   @default(PENDING)
+  minutes  Int             @default(0)
+  note     String?
+  loggedAt DateTime?
+  // When a TASK_REMINDER / TASK_MISSED notification was pushed for this period
+  // (null = not yet) — so a period is only ever reminded once.
+  remindedAt DateTime?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  @@unique([taskId, periodKey])
+  @@index([taskId, periodKey])
+}
+
 model Notification {
   id        String   @id @default(uuid())
   userId    String
@@ -271,7 +321,7 @@ model Notification {
   request   Request? @relation(fields: [requestId], references: [id], onDelete: Cascade)
   title     String
   body      String
-  kind      String // ASSIGNED | MOVED | COMMENT | STATUS | CLOSED | REQUEST_RAISED
+  kind      String // ASSIGNED | MOVED | COMMENT | STATUS | CLOSED | REQUEST_RAISED | TASK_REMINDER | TASK_MISSED
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
   @@index([userId, read])
