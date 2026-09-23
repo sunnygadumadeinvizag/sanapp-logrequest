@@ -208,9 +208,9 @@ export function AdminTaskDetailClient({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Link href={apiPath("/admin/tasks")} className="text-sm text-primary hover:underline">
+        <a href={apiPath("/admin/tasks")} className="text-sm text-primary hover:underline">
           ← All tasks
-        </Link>
+        </a>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" onClick={load} disabled={busy}>
             <RefreshCw className="mr-1 h-3 w-3" /> Refresh

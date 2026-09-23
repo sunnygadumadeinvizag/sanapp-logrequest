@@ -262,7 +262,7 @@ export function expectedScheduledDates(
   to: Date,
   createdAt?: Date | null
 ): string[] {
-  const startMs = Math.max(from.getTime(), (createdAt ?? from).getTime());
+  const startMs = Math.max(from.getTime(), 0);
   const endMs = to.getTime();
   if (endMs < startMs) return [];
   const out: string[] = [];
@@ -348,10 +348,19 @@ export function computeTaskStats(options: {
   const { schedule, logs, userId } = options;
   const now = options.to ?? new Date();
   const createdAt = options.createdAt ?? null;
-  const earliest =
+  // Window: back through STATS_WINDOW_DAYS, but always cover any backfilled
+  // work days (logDate / full-date periodKey) so past closes still count.
+  let earliest =
     createdAt && createdAt.getTime() > now.getTime() - STATS_WINDOW_DAYS * 86400000
       ? createdAt
       : new Date(now.getTime() - (STATS_WINDOW_DAYS - 1) * 86400000);
+  for (const l of logs) {
+    if (l.userId && l.userId !== userId) continue;
+    const dk = dateKeyFrom(l.logDate) || (/^\d{4}-\d{2}-\d{2}$/.test(l.periodKey) ? l.periodKey : "");
+    if (!dk) continue;
+    const t = Date.parse(`${dk}T00:00:00.000Z`);
+    if (!Number.isNaN(t) && t < earliest.getTime()) earliest = new Date(t);
+  }
   const from = options.from ?? earliest;
   const mine = logs.filter((l) => l.userId === userId);
   const todayKey = istDateKey(now);
@@ -367,7 +376,7 @@ export function computeTaskStats(options: {
     else if (/^\d{4}-\d{2}-\d{2}$/.test(l.periodKey)) workDateToLog.set(l.periodKey, l);
   }
 
-  const scheduled = expectedScheduledDates(schedule, from, now, createdAt);
+  const scheduled = expectedScheduledDates(schedule, from, now, null);
   const minutesByDate: Record<string, number> = {};
   const missedDates: string[] = [];
   const workedDates: string[] = [];

@@ -313,18 +313,18 @@ export function TaskDetailClient({ initialTask, meId }: { initialTask: Task; meI
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <Link href={apiPath("/tasks")} className="text-sm text-primary hover:underline">
+        <a href={apiPath("/tasks")} className="text-sm text-primary hover:underline">
           ← My Tasks
-        </Link>
-        <Link
+        </a>
+        <a
           href={apiPath(`/tasks/${task.id}/calendar`)}
           className="iipe-btn !py-1.5 text-xs"
         >
           <CalendarDays className="mr-1 inline h-3.5 w-3.5" /> Calendar
-        </Link>
-        <Link href={apiPath("/tasks/monitor")} className="iipe-btn !py-1.5 text-xs">
+        </a>
+        <a href={apiPath("/tasks/monitor")} className="iipe-btn !py-1.5 text-xs">
           <BarChart3 className="mr-1 inline h-3.5 w-3.5" /> My monitor
-        </Link>
+        </a>
         {task.isCreator && (
           <Button
             size="sm"
@@ -444,12 +444,12 @@ export function TaskDetailClient({ initialTask, meId }: { initialTask: Task; meI
           <p className="flex items-center gap-1.5 text-sm font-semibold">
             <History className="h-4 w-4" /> History ({task.logs.length})
           </p>
-          <Link
+          <a
             href={apiPath(`/tasks/${task.id}/calendar`)}
             className="text-xs text-primary hover:underline"
           >
             Open calendar →
-          </Link>
+          </a>
         </div>
         <div className="overflow-x-auto rounded-md border">
           <table className="w-full min-w-[560px] text-left text-xs">

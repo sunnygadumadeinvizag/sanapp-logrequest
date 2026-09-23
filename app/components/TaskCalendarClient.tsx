@@ -197,9 +197,9 @@ export function TaskCalendarClient({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Link href={apiPath(`/tasks/${taskId}`)} className="text-sm text-primary hover:underline">
+          <a href={apiPath(`/tasks/${taskId}`)} className="text-sm text-primary hover:underline">
             ← Task detail
-          </Link>
+          </a>
           <Badge variant="outline">{taskTitle}</Badge>
         </div>
         <div className="flex flex-wrap items-center gap-2">

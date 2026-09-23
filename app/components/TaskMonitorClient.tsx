@@ -125,9 +125,9 @@ export function TaskMonitorClient() {
       {rows.length === 0 ? (
         <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">
           No tasks to monitor yet.{" "}
-          <Link href={apiPath("/tasks/new")} className="text-primary underline">
+          <a href={apiPath("/tasks/new")} className="text-primary underline">
             Create one
-          </Link>
+          </a>
           .
         </div>
       ) : (
@@ -148,9 +148,9 @@ export function TaskMonitorClient() {
               {rows.map((r) => (
                 <tr key={r.taskId} className="border-t">
                   <td className="px-3 py-2 font-medium">
-                    <Link href={apiPath(`/tasks/${r.taskId}`)} className="text-primary hover:underline">
+                    <a href={apiPath(`/tasks/${r.taskId}`)} className="text-primary hover:underline">
                       {r.title}
-                    </Link>
+                    </a>
                   </td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">{r.scheduleText}</td>
                   <td className="px-3 py-2">{r.daysWorked}</td>
@@ -174,13 +174,13 @@ export function TaskMonitorClient() {
                     </Badge>
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-xs">
-                    <Link href={apiPath(`/tasks/${r.taskId}/calendar`)} className="text-primary hover:underline">
+                    <a href={apiPath(`/tasks/${r.taskId}/calendar`)} className="text-primary hover:underline">
                       Calendar
-                    </Link>
+                    </a>
                     <span className="mx-1 text-muted-foreground">·</span>
-                    <Link href={apiPath(`/tasks/${r.taskId}`)} className="text-primary hover:underline">
+                    <a href={apiPath(`/tasks/${r.taskId}`)} className="text-primary hover:underline">
                       Detail
-                    </Link>
+                    </a>
                   </td>
                 </tr>
               ))}
