@@ -489,7 +489,7 @@ export function TasksClient({
                     )}
                   </div>
 
-                  <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                  <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:shrink-0 sm:justify-end">
                     {t.active && (
                       <>
                         <Button size="sm" onClick={() => openLog(t)} disabled={busyId === t.id}>

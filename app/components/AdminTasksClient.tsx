@@ -438,7 +438,7 @@ export function AdminTasksClient() {
                         </div>
                       )}
                     </div>
-                    <div className="flex shrink-0 gap-1">
+                    <div className="flex w-full shrink-0 gap-1 sm:w-auto">
                       <Button variant="ghost" size="sm" onClick={() => pauseTask(t)} disabled={!t.active}>
                         {t.active ? "Pause" : "Paused"}
                       </Button>
