@@ -27,7 +27,7 @@ export async function AppShell({
   children,
 }: {
   me: AppUserSession;
-  active?: "home" | "requests" | "queue" | "my-work" | "notifications" | "tasks" | "admin";
+  active?: "home" | "requests" | "queue" | "my-work" | "notifications" | "tasks" | "admin" | "hours";
   sidebarItems: SidebarItem[];
   children: ReactNode;
 }) {
@@ -111,10 +111,21 @@ export async function AppShell({
     active: active === "tasks",
   });
   baseItems.push({
+    label: "My Hours",
+    href: "/hours",
+    active: active === "hours",
+  });
+  baseItems.push({
     label: unreadCount > 0 ? `App Notifications (${unreadCount})` : "App Notifications",
     href: "/notifications",
     active: active === "notifications",
   });
+  if (isPoc) {
+    baseItems.push({
+      label: "Hours Oversight",
+      href: "/admin/hours",
+    });
+  }
   if (local?.role === "ADMIN") {
     baseItems.push(
       { label: "App Admin Console", href: "/admin", heading: true, active: active === "admin" },
