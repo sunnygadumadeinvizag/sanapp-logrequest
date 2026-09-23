@@ -61,20 +61,33 @@ export async function AppShell({
 
   const isPoc = local?.role === "POC" || local?.role === "ADMIN";
 
-  // Recurring-task due badge (current period still PENDING).
+  // Recurring-task due badge (current period still PENDING/MISSED for me).
   let dueCount = 0;
   if (local) {
     try {
+      const userId = local.id;
       const { sendDueReminders, periodKeyFor } = await import("@/lib/tasks");
       // Sync the period logs and push any due/missed reminder (deduped per period).
-      await sendDueReminders(local.id);
+      await sendDueReminders(userId);
       const dueTasks = await prisma.recurringTask.findMany({
-        where: { userId: local.id, active: true },
-        include: { logs: { orderBy: { periodKey: "desc" }, take: 3 } },
+        where: {
+          active: true,
+          OR: [{ userId }, { assignees: { some: { userId } } }],
+        },
+        include: { logs: { where: { userId }, orderBy: { periodKey: "desc" }, take: 3 } },
       });
       dueCount = dueTasks.filter((t) => {
-        const cur = periodKeyFor(t.recurrence as any);
-        return t.logs.some((l) => l.periodKey === cur && l.status === "PENDING");
+        const cur = periodKeyFor({
+          recurrence: t.recurrence,
+          weekday: t.weekday,
+          dayOfMonth: t.dayOfMonth,
+          monthOfYear: t.monthOfYear,
+          anchorMonth: t.anchorMonth,
+          specificDate: t.specificDate,
+        });
+        return t.logs.some(
+          (l) => l.periodKey === cur && (l.status === "PENDING" || l.status === "MISSED")
+        );
       }).length;
     } catch {
       dueCount = 0;
@@ -111,6 +124,12 @@ export async function AppShell({
       { label: "Tracking: Categories", href: "/admin/analytics/categories" },
       { label: "Task Oversight", href: "/admin/tasks" }
     );
+  } else if (local?.role === "POC") {
+    baseItems.push({
+      label: "Task Oversight",
+      href: "/admin/tasks",
+      active: active === "admin",
+    });
   }
   const items = [...baseItems, ...sidebarItems];
 

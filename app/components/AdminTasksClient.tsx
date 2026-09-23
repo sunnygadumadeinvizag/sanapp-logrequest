@@ -7,6 +7,30 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, Search, RefreshCw, ChevronDown, ChevronRight, BellRing } from "lucide-react";
 
+type Participant = { id: string; username: string; name: string; role?: string };
+
+type AdminLog = {
+  id: string;
+  userId: string;
+  user: Participant;
+  periodKey: string;
+  status: string;
+  minutes: number;
+  note: string | null;
+  logDate: string | null;
+  loggedAt: string | null;
+};
+
+type CurrentLog = {
+  userId: string;
+  user: Participant;
+  status: string;
+  minutes: number;
+  note: string | null;
+  logDate: string | null;
+  loggedAt: string | null;
+};
+
 type AdminTask = {
   id: string;
   title: string;
@@ -14,14 +38,22 @@ type AdminTask = {
   recurrence: string;
   weekday: number | null;
   dayOfMonth: number | null;
+  monthOfYear: number | null;
+  anchorMonth: number | null;
+  specificDate: string | null;
+  scheduleText: string;
   reminderEnabled: boolean;
   active: boolean;
-  user: { id: string; username: string; name: string; role: string };
-  currentLog: { periodKey: string; status: string; minutes: number; note: string | null; loggedAt: string | null } | null;
+  user: Participant;
+  assignees: Participant[];
+  currentPeriod: string;
+  currentLogs: CurrentLog[];
+  anyoneCompleted: boolean;
   completed: number;
   missed: number;
   totalMinutes: number;
-  logs: { periodKey: string; status: string; minutes: number; note: string | null; loggedAt: string | null }[];
+  currentMinutes: number;
+  logs: AdminLog[];
   createdAt: string;
 };
 
@@ -38,9 +70,18 @@ type UserSummary = {
   completed: number;
   minutesThisPeriod: number;
   minutesTotal: number;
+  lastLogAt: string | null;
 };
 
-const REC: Record<string, string> = { DAILY: "Daily", WEEKLY: "Weekly", MONTHLY: "Monthly" };
+const REC: Record<string, string> = {
+  DAILY: "Daily",
+  WEEKLY: "Weekly",
+  MONTHLY: "Monthly",
+  QUARTERLY: "Quarterly",
+  HALF_YEARLY: "Half-yearly",
+  YEARLY: "Yearly",
+  ONE_TIME: "One-time",
+};
 const STATUS_LABEL: Record<string, string> = {
   PENDING: "Pending",
   COMPLETED: "Completed",
@@ -61,6 +102,17 @@ function fmtMinutes(m: number) {
   if (h && min) return `${h} h ${min} min`;
   if (h) return `${h} h`;
   return `${min} min`;
+}
+
+function fmtDate(iso: string | null) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Kolkata",
+  });
 }
 
 export function AdminTasksClient() {
@@ -160,7 +212,7 @@ export function AdminTasksClient() {
           <p className="mt-1 text-2xl font-bold text-destructive">{totals.missed}</p>
         </div>
         <div className="rounded-lg border bg-card p-4">
-          <p className="text-xs text-muted-foreground">Completed (current)</p>
+          <p className="text-xs text-muted-foreground">Worked this period</p>
           <p className="mt-1 text-2xl font-bold text-green-600">{totals.completed}</p>
         </div>
         <div className="rounded-lg border bg-card p-4">
@@ -199,7 +251,7 @@ export function AdminTasksClient() {
           <option value="">All statuses</option>
           <option value="due">Due now</option>
           <option value="missed">Missed</option>
-          <option value="completed">Completed</option>
+          <option value="completed">Worked this period</option>
         </select>
         <Button variant="outline" size="sm" onClick={load}>
           <RefreshCw className="mr-1 h-3.5 w-3.5" /> Refresh
@@ -216,21 +268,22 @@ export function AdminTasksClient() {
 
       {/* Per-user roll-up */}
       <div className="rounded-lg border bg-card">
-        <div className="border-b px-3 py-2 text-sm font-semibold">By person</div>
+        <div className="border-b px-3 py-2 text-sm font-semibold">By person — who is actually working</div>
         {summaries.length === 0 ? (
-          <p className="p-6 text-center text-sm text-muted-foreground">No recurring tasks yet.</p>
+          <p className="p-6 text-center text-sm text-muted-foreground">No tasks yet.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
+            <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="bg-muted/40 text-xs text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 font-medium">Person</th>
                   <th className="px-3 py-2 font-medium">Tasks</th>
                   <th className="px-3 py-2 font-medium">Due</th>
                   <th className="px-3 py-2 font-medium">Missed</th>
-                  <th className="px-3 py-2 font-medium">Completed</th>
+                  <th className="px-3 py-2 font-medium">Completed periods</th>
                   <th className="px-3 py-2 font-medium">Time this period</th>
                   <th className="px-3 py-2 font-medium">Time all time</th>
+                  <th className="px-3 py-2 font-medium">Last log</th>
                 </tr>
               </thead>
               <tbody>
@@ -246,6 +299,9 @@ export function AdminTasksClient() {
                     <td className="px-3 py-2 text-green-600">{u.completed}</td>
                     <td className="px-3 py-2">{fmtMinutes(u.minutesThisPeriod)}</td>
                     <td className="px-3 py-2 text-muted-foreground">{fmtMinutes(u.minutesTotal)}</td>
+                    <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">
+                      {fmtDate(u.lastLogAt)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -268,7 +324,15 @@ export function AdminTasksClient() {
           <div className="divide-y">
             {tasks.map((t) => {
               const expanded = expandedId === t.id;
-              const st = t.currentLog?.status ?? "PENDING";
+              const statuses = t.currentLogs.map((l) => l.status);
+              const st = statuses.includes("COMPLETED")
+                ? "COMPLETED"
+                : statuses.includes("PENDING")
+                  ? "PENDING"
+                  : statuses.includes("MISSED")
+                    ? "MISSED"
+                    : statuses[0] ?? "PENDING";
+              const assigneeNames = t.assignees.map((a) => a.name).join(", ");
               return (
                 <div key={t.id} className="p-3">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -280,11 +344,41 @@ export function AdminTasksClient() {
                         {!t.active && <Badge variant="secondary">Paused</Badge>}
                       </div>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        {t.user.name} (@{t.user.username}) · {t.user.role}
-                        {t.currentLog ? ` · period ${t.currentLog.periodKey}` : ""}
-                        {t.currentLog?.minutes ? ` · ${fmtMinutes(t.currentLog.minutes)} this period` : ""}
-                        {` · ${t.completed} completed / ${t.missed} missed · ${fmtMinutes(t.totalMinutes)} total`}
+                        by {t.user.name} (@{t.user.username})
+                        {assigneeNames ? ` · assigned: ${assigneeNames}` : " · personal"}
+                        {` · ${t.scheduleText}`}
+                        {` · period ${t.currentPeriod}`}
                       </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {`${t.completed} completed / ${t.missed} missed periods · ${fmtMinutes(t.totalMinutes)} total`}
+                        {t.currentMinutes > 0 && ` · ${fmtMinutes(t.currentMinutes)} this period`}
+                        {` · ${t.currentLogs.length} participant${t.currentLogs.length === 1 ? "" : "s"} logged this period`}
+                      </p>
+
+                      {/* Who logged this period — the core oversight view. */}
+                      {t.currentLogs.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {t.currentLogs.map((l) => (
+                            <span
+                              key={l.userId}
+                              className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs"
+                              title={l.note ?? undefined}
+                            >
+                              <span className="font-medium">{l.user?.name ?? "—"}</span>
+                              <Badge variant={STATUS_BADGE[l.status] ?? "outline"} className="px-1 py-0 text-[10px]">
+                                {STATUS_LABEL[l.status] ?? l.status}
+                              </Badge>
+                              {l.minutes > 0 && (
+                                <span className="text-muted-foreground">{l.minutes}m</span>
+                              )}
+                              {l.loggedAt && (
+                                <span className="text-muted-foreground">{fmtDate(l.loggedAt)}</span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
                       <button
                         type="button"
                         onClick={() => setExpandedId(expanded ? null : t.id)}
@@ -296,31 +390,33 @@ export function AdminTasksClient() {
                         ) : (
                           <ChevronRight className="h-3.5 w-3.5" />
                         )}
-                        History ({t.logs.length})
+                        Full log history ({t.logs.length})
                       </button>
                       {expanded && (
                         <div className="mt-2 overflow-x-auto rounded-md border">
-                          <table className="w-full min-w-[460px] text-left text-xs">
+                          <table className="w-full min-w-[560px] text-left text-xs">
                             <thead className="bg-muted/40 text-muted-foreground">
                               <tr>
                                 <th className="px-2 py-1.5 font-medium">Period</th>
+                                <th className="px-2 py-1.5 font-medium">Who</th>
                                 <th className="px-2 py-1.5 font-medium">Status</th>
                                 <th className="px-2 py-1.5 font-medium">Time</th>
                                 <th className="px-2 py-1.5 font-medium">Logged</th>
-                                <th className="px-2 py-1.5 font-medium">Note</th>
+                                <th className="px-2 py-1.5 font-medium">Comment</th>
                               </tr>
                             </thead>
                             <tbody>
                               {t.logs.length === 0 && (
                                 <tr>
-                                  <td colSpan={5} className="px-2 py-2 text-muted-foreground">
+                                  <td colSpan={6} className="px-2 py-2 text-muted-foreground">
                                     No history yet.
                                   </td>
                                 </tr>
                               )}
                               {t.logs.map((l) => (
-                                <tr key={l.periodKey} className="border-t">
+                                <tr key={l.id} className="border-t">
                                   <td className="whitespace-nowrap px-2 py-1.5">{l.periodKey}</td>
+                                  <td className="whitespace-nowrap px-2 py-1.5">{l.user?.name ?? "—"}</td>
                                   <td className="px-2 py-1.5">
                                     <Badge variant={STATUS_BADGE[l.status] ?? "outline"}>
                                       {STATUS_LABEL[l.status] ?? l.status}
@@ -330,15 +426,7 @@ export function AdminTasksClient() {
                                     {l.status === "COMPLETED" ? fmtMinutes(l.minutes) : "—"}
                                   </td>
                                   <td className="whitespace-nowrap px-2 py-1.5 text-muted-foreground">
-                                    {l.loggedAt
-                                      ? new Date(l.loggedAt).toLocaleString("en-IN", {
-                                          day: "2-digit",
-                                          month: "short",
-                                          hour: "2-digit",
-                                          minute: "2-digit",
-                                          timeZone: "Asia/Kolkata",
-                                        })
-                                      : "—"}
+                                    {fmtDate(l.loggedAt)}
                                   </td>
                                   <td className="max-w-[220px] px-2 py-1.5 text-muted-foreground">
                                     {l.note ?? "—"}

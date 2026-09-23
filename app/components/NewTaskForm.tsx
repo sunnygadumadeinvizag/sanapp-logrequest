@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiPath } from "sanapp-common-ui";
 import { Button } from "@/components/ui/button";
@@ -18,24 +18,60 @@ import {
 import { Loader2 } from "lucide-react";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MONTHS = [
+  "", "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
 
-export function NewTaskForm() {
+const RECURRENCES: { value: string; label: string }[] = [
+  { value: "DAILY", label: "Daily" },
+  { value: "WEEKLY", label: "Weekly" },
+  { value: "MONTHLY", label: "Monthly" },
+  { value: "QUARTERLY", label: "Quarterly" },
+  { value: "HALF_YEARLY", label: "Half-yearly" },
+  { value: "YEARLY", label: "Yearly" },
+  { value: "ONE_TIME", label: "One-time (specific date)" },
+];
+
+type UserOption = { id: string; username: string; name: string; role: string };
+
+export function NewTaskForm({
+  users,
+  meId,
+}: {
+  users: UserOption[];
+  meId: string;
+}) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [recurrence, setRecurrence] = useState<"DAILY" | "WEEKLY" | "MONTHLY">("DAILY");
+  const [recurrence, setRecurrence] = useState("DAILY");
   const [weekday, setWeekday] = useState("1");
   const [dayOfMonth, setDayOfMonth] = useState("1");
+  const [monthOfYear, setMonthOfYear] = useState(String(new Date().getMonth() + 1));
+  const [anchorMonth, setAnchorMonth] = useState(String(new Date().getMonth() + 1));
+  const [specificDate, setSpecificDate] = useState("");
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [reminder, setReminder] = useState(true);
   const [reminderTime, setReminderTime] = useState("09:00");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const others = useMemo(() => users.filter((u) => u.id !== meId), [users, meId]);
+
+  function toggleAssignee(id: string) {
+    setAssigneeIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     if (!title.trim()) {
       setError("Title is required.");
+      return;
+    }
+    if (recurrence === "ONE_TIME" && !specificDate) {
+      setError("Pick the date this one-time task is due.");
       return;
     }
     setBusy(true);
@@ -48,7 +84,16 @@ export function NewTaskForm() {
           description: description.trim() || undefined,
           recurrence,
           weekday: recurrence === "WEEKLY" ? Number(weekday) : undefined,
-          dayOfMonth: recurrence === "MONTHLY" ? Number(dayOfMonth) : undefined,
+          dayOfMonth: ["MONTHLY", "QUARTERLY", "HALF_YEARLY", "YEARLY"].includes(recurrence)
+            ? Number(dayOfMonth)
+            : undefined,
+          monthOfYear: recurrence === "YEARLY" ? Number(monthOfYear) : undefined,
+          anchorMonth:
+            recurrence === "QUARTERLY" || recurrence === "HALF_YEARLY"
+              ? Number(anchorMonth)
+              : undefined,
+          specificDate: recurrence === "ONE_TIME" ? specificDate : undefined,
+          assigneeIds,
           reminderEnabled: reminder,
           reminderTime: reminder ? reminderTime : undefined,
         }),
@@ -67,6 +112,8 @@ export function NewTaskForm() {
     }
   }
 
+  const showDay = ["MONTHLY", "QUARTERLY", "HALF_YEARLY", "YEARLY"].includes(recurrence);
+
   return (
     <form onSubmit={submit} className="space-y-4">
       {error && (
@@ -79,7 +126,7 @@ export function NewTaskForm() {
         <Label htmlFor="title">Title *</Label>
         <Input
           id="title"
-          placeholder="e.g. Daily backup, Weekly camera maintenance check"
+          placeholder="e.g. Daily backup, Quarterly audit, Yearly renewal"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
@@ -99,14 +146,16 @@ export function NewTaskForm() {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label>Repeats</Label>
-          <Select value={recurrence} onValueChange={(v) => setRecurrence(v as any)}>
+          <Select value={recurrence} onValueChange={setRecurrence}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="DAILY">Daily</SelectItem>
-              <SelectItem value="WEEKLY">Weekly</SelectItem>
-              <SelectItem value="MONTHLY">Monthly</SelectItem>
+              {RECURRENCES.map((r) => (
+                <SelectItem key={r.value} value={r.value}>
+                  {r.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -129,7 +178,19 @@ export function NewTaskForm() {
           </div>
         )}
 
-        {recurrence === "MONTHLY" && (
+        {recurrence === "ONE_TIME" && (
+          <div className="space-y-1.5">
+            <Label htmlFor="specific-date">Due date *</Label>
+            <Input
+              id="specific-date"
+              type="date"
+              value={specificDate}
+              onChange={(e) => setSpecificDate(e.target.value)}
+            />
+          </div>
+        )}
+
+        {showDay && (
           <div className="space-y-1.5">
             <Label htmlFor="dom">Day of month (1–31)</Label>
             <Input
@@ -142,12 +203,89 @@ export function NewTaskForm() {
             />
           </div>
         )}
+
+        {recurrence === "YEARLY" && (
+          <div className="space-y-1.5">
+            <Label>Month</Label>
+            <Select value={monthOfYear} onValueChange={setMonthOfYear}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTHS.slice(1).map((m, i) => (
+                  <SelectItem key={i + 1} value={String(i + 1)}>
+                    {m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {(recurrence === "QUARTERLY" || recurrence === "HALF_YEARLY") && (
+          <div className="space-y-1.5">
+            <Label>Cycle starts in</Label>
+            <Select value={anchorMonth} onValueChange={setAnchorMonth}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTHS.slice(1).map((m, i) => (
+                  <SelectItem key={i + 1} value={String(i + 1)}>
+                    {m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {recurrence === "QUARTERLY"
+                ? "Quarterly runs every 3 months from this month."
+                : "Half-yearly runs every 6 months from this month."}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-lg border p-3">
+        <Label className="text-sm font-medium">Assign to</Label>
+        <p className="mb-2 text-xs text-muted-foreground">
+          Assigned people (and you, the creator) can each log time and comments for this task.
+          Leave everyone unchecked to keep it a personal task.
+        </p>
+        {others.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No other users yet.</p>
+        ) : (
+          <div className="max-h-48 space-y-1.5 overflow-y-auto">
+            {others.map((u) => (
+              <label
+                key={u.id}
+                className="flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 text-sm hover:bg-muted/40"
+              >
+                <Checkbox
+                  checked={assigneeIds.includes(u.id)}
+                  onCheckedChange={() => toggleAssignee(u.id)}
+                />
+                <span className="min-w-0 flex-1 truncate">
+                  {u.name}{" "}
+                  <span className="text-xs text-muted-foreground">
+                    (@{u.username} · {u.role})
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
+        {assigneeIds.length > 0 && (
+          <p className="mt-2 text-xs text-primary">
+            {assigneeIds.length} assignee{assigneeIds.length === 1 ? "" : "s"} selected
+          </p>
+        )}
       </div>
 
       <div className="rounded-lg border p-3">
         <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
           <Checkbox checked={reminder} onCheckedChange={(v) => setReminder(v === true)} />
-          Remind me when this task is due
+          Remind participants when this task is due
         </label>
         {reminder && (
           <div className="mt-3 max-w-[12rem] space-y-1.5">
@@ -159,7 +297,7 @@ export function NewTaskForm() {
               onChange={(e) => setReminderTime(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              The reminder appears in your notification bell at this time.
+              The reminder appears in each participant&apos;s notification bell at this time.
             </p>
           </div>
         )}

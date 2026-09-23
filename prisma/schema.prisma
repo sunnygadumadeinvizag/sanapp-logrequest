@@ -67,7 +67,9 @@ model AppUser {
   reads         RequestCommentRead[]
   workerRequests RequestWorker[] // requests this user is an extra worker on
   addedWorkers   RequestWorker[] @relation("WorkerAddedBy")
-  recurringTasks RecurringTask[]
+  recurringTasks RecurringTask[] // tasks this user created
+  taskAssignments TaskAssignee[] // tasks assigned to this user
+  taskLogs       RecurringTaskLog[] // work logs this user has entered
 }
 
 model Category {
@@ -268,6 +270,10 @@ enum TaskRecurrence {
   DAILY
   WEEKLY
   MONTHLY
+  QUARTERLY
+  HALF_YEARLY
+  YEARLY
+  ONE_TIME // a specific calendar date (no repeat)
 }
 
 enum TaskLogStatus {
@@ -279,38 +285,59 @@ enum TaskLogStatus {
 
 model RecurringTask {
   id              String           @id @default(uuid())
-  userId          String
+  userId          String // creator
   user            AppUser          @relation(fields: [userId], references: [id], onDelete: Cascade)
   title           String
   description     String?
   recurrence      TaskRecurrence
   weekday         Int? // 0=Sun..6=Sat, used when recurrence=WEEKLY
-  dayOfMonth      Int? // 1..31, used when recurrence=MONTHLY
+  dayOfMonth      Int? // 1..31, used when recurrence=MONTHLY/QUARTERLY/HALF_YEARLY/YEARLY
+  monthOfYear     Int? // 1..12, used when recurrence=YEARLY
+  anchorMonth     Int? // 1..12, first month of the cycle for QUARTERLY/HALF_YEARLY
+  specificDate    DateTime? // IST date (midnight UTC storage), used when recurrence=ONE_TIME
   reminderEnabled Boolean          @default(true)
   reminderTime    String? // IST "HH:MM" — when the reminder is pushed; null = 09:00
   active          Boolean          @default(true)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
+  assignees       TaskAssignee[]
   logs            RecurringTaskLog[]
   @@index([userId, active])
 }
 
+// Participants (other than the creator) who must log work against a task.
+model TaskAssignee {
+  id        String        @id @default(uuid())
+  taskId    String
+  task      RecurringTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  user      AppUser       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+  @@unique([taskId, userId])
+  @@index([userId])
+}
+
+// One row per (task, period, user) — several people can log the same day.
 model RecurringTaskLog {
   id       String          @id @default(uuid())
   taskId   String
   task     RecurringTask   @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  periodKey String // DAILY: YYYY-MM-DD, WEEKLY: week-start YYYY-MM-DD, MONTHLY: YYYY-MM
+  userId   String // who entered this log (creator or assignee)
+  user     AppUser         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  periodKey String // DAILY/ONE_TIME: YYYY-MM-DD, WEEKLY: week-start, MONTHLY/QUARTERLY/HALF_YEARLY/YEARLY: YYYY-MM
   status   TaskLogStatus   @default(PENDING)
   minutes  Int             @default(0)
-  note     String?
+  note     String? // comment describing the work done
+  logDate  DateTime? // the calendar day (IST midnight) the work applies to — set on completion
   loggedAt DateTime?
   // When a TASK_REMINDER / TASK_MISSED notification was pushed for this period
-  // (null = not yet) — so a period is only ever reminded once.
+  // (null = not yet) — so a period is only ever reminded once per user.
   remindedAt DateTime?
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
-  @@unique([taskId, periodKey])
+  @@unique([taskId, periodKey, userId])
   @@index([taskId, periodKey])
+  @@index([userId, periodKey])
 }
 
 model Notification {

@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminTasksPage() {
   const me = await currentUser();
-  if (!me || me.role !== "ADMIN") notFound();
+  if (!me || (me.role !== "ADMIN" && me.role !== "POC")) notFound();
 
   await syncTaskLogs();
 
@@ -31,7 +31,7 @@ export default async function AdminTasksPage() {
       </div>
       <h1 className="iipe-page-title">Task Oversight</h1>
       <p className="iipe-page-sub">
-        Every recurring task across users — who is due, who missed, and completion history.
+        Every task across users — who logged, how much time, how frequently work is happening, and who missed periods.
       </p>
       <div className="mt-4">
         <AdminTasksClient />

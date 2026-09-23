@@ -28,7 +28,6 @@ import {
 import {
   Loader2,
   Pencil,
-  Plus,
   Trash2,
   CheckCircle2,
   Clock,
@@ -36,14 +35,20 @@ import {
   ChevronDown,
   ChevronRight,
   History,
+  Users,
 } from "lucide-react";
+
+type Participant = { id: string; username: string; name: string };
 
 type TaskLog = {
   id: string;
+  userId: string;
+  user?: Participant;
   periodKey: string;
   status: string;
   minutes: number;
   note: string | null;
+  logDate: string | null;
   loggedAt: string | null;
 };
 
@@ -54,16 +59,32 @@ type Task = {
   recurrence: string;
   weekday: number | null;
   dayOfMonth: number | null;
+  monthOfYear: number | null;
+  anchorMonth: number | null;
+  specificDate: string | null;
+  scheduleText: string;
   reminderEnabled: boolean;
   reminderTime?: string | null;
   active: boolean;
   createdAt: string;
+  user?: Participant;
+  assignees: Participant[];
+  participants: Participant[];
+  isCreator: boolean;
+  currentPeriod: string;
   currentLog: TaskLog | null;
   logs: TaskLog[];
 };
 
-const REC_LABELS: Record<string, string> = { DAILY: "Daily", WEEKLY: "Weekly", MONTHLY: "Monthly" };
-const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const REC_LABELS: Record<string, string> = {
+  DAILY: "Daily",
+  WEEKLY: "Weekly",
+  MONTHLY: "Monthly",
+  QUARTERLY: "Quarterly",
+  HALF_YEARLY: "Half-yearly",
+  YEARLY: "Yearly",
+  ONE_TIME: "One-time",
+};
 const STATUS_BADGE: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   PENDING: "outline",
   COMPLETED: "default",
@@ -77,12 +98,6 @@ const STATUS_LABEL: Record<string, string> = {
   SKIPPED: "Skipped",
 };
 
-function scheduleText(t: Task) {
-  if (t.recurrence === "DAILY") return "Every day";
-  if (t.recurrence === "WEEKLY") return `Every ${DAY_NAMES[t.weekday ?? 1] ?? "Monday"}`;
-  return `Every month on day ${t.dayOfMonth ?? 1}`;
-}
-
 function fmtMinutes(m: number) {
   if (!m) return "0 min";
   const h = Math.floor(m / 60);
@@ -93,7 +108,6 @@ function fmtMinutes(m: number) {
 }
 
 function periodLabel(key: string) {
-  // DAILY: YYYY-MM-DD, WEEKLY: YYYY-MM-DD (week start), MONTHLY: YYYY-MM
   if (/^\d{4}-\d{2}$/.test(key)) {
     const [y, m] = key.split("-");
     const d = new Date(Number(y), Number(m) - 1, 1);
@@ -103,7 +117,21 @@ function periodLabel(key: string) {
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
-export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
+function todayIST(): string {
+  // YYYY-MM-DD of "now" in IST for the date input default.
+  const ist = new Date(Date.now() + (5.5 * 60 * 60 * 1000));
+  return ist.toISOString().slice(0, 10);
+}
+
+export function TasksClient({
+  initialTasks,
+  meId,
+  users = [],
+}: {
+  initialTasks: Task[];
+  meId: string;
+  users?: { id: string; username: string; name: string; role: string }[];
+}) {
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -116,6 +144,7 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
   const [logTarget, setLogTarget] = useState<Task | null>(null);
   const [logMinutes, setLogMinutes] = useState("30");
   const [logNote, setLogNote] = useState("");
+  const [logDate, setLogDate] = useState(todayIST());
 
   // Edit dialog state
   const [editTarget, setEditTarget] = useState<Task | null>(null);
@@ -124,8 +153,12 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
   const [editRecurrence, setEditRecurrence] = useState("DAILY");
   const [editWeekday, setEditWeekday] = useState("1");
   const [editDayOfMonth, setEditDayOfMonth] = useState("1");
+  const [editMonthOfYear, setEditMonthOfYear] = useState("1");
+  const [editAnchorMonth, setEditAnchorMonth] = useState("1");
+  const [editSpecificDate, setEditSpecificDate] = useState("");
   const [editReminder, setEditReminder] = useState(true);
   const [editReminderTime, setEditReminderTime] = useState("09:00");
+  const [editAssignees, setEditAssignees] = useState<string[]>([]);
 
   const flash = (ok: boolean, text: string) => {
     setMsg(ok ? text : null);
@@ -136,48 +169,47 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
     }, 4000);
   };
 
-  async function postLog(task: Task, status: string, minutes = 0, note = "") {
+  function applyLog(taskId: string, log: TaskLog) {
+    setTasks((ts) =>
+      ts.map((t) => {
+        if (t.id !== taskId) return t;
+        const others = t.logs.filter(
+          (l) => !(l.periodKey === log.periodKey && l.userId === log.userId)
+        );
+        const nextLogs = [log, ...others];
+        const currentLog =
+          log.periodKey === t.currentPeriod && log.userId === meId ? log : t.currentLog;
+        return { ...t, logs: nextLogs, currentLog };
+      })
+    );
+  }
+
+  async function postLog(
+    task: Task,
+    status: string,
+    minutes = 0,
+    note = "",
+    date?: string
+  ) {
     setBusyId(task.id);
     try {
       const res = await fetch(apiPath(`/api/tasks/${task.id}/log`), {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ status, minutes, note }),
+        body: JSON.stringify({ status, minutes, note, date: date || undefined }),
       });
       const d = await res.json();
       if (!res.ok) {
         flash(false, d?.error ?? "Could not save log");
         return;
       }
-      setTasks((ts) =>
-        ts.map((t) =>
-          t.id === task.id
-            ? {
-                ...t,
-                currentLog: {
-                  id: d.log.id,
-                  periodKey: d.log.periodKey,
-                  status: d.log.status,
-                  minutes: d.log.minutes,
-                  note: d.log.note,
-                  loggedAt: d.log.loggedAt,
-                },
-                logs: [
-                  {
-                    id: d.log.id,
-                    periodKey: d.log.periodKey,
-                    status: d.log.status,
-                    minutes: d.log.minutes,
-                    note: d.log.note,
-                    loggedAt: d.log.loggedAt,
-                  },
-                  ...t.logs.filter((l) => l.periodKey !== d.log.periodKey),
-                ],
-              }
-            : t
-        )
+      applyLog(task.id, d.log);
+      flash(
+        true,
+        status === "COMPLETED"
+          ? `Logged for ${d.log.periodKey}${date && date !== todayIST() ? " (past date)" : ""}`
+          : "Updated"
       );
-      flash(true, status === "COMPLETED" ? "Task logged for this period" : "Updated");
       router.refresh();
     } finally {
       setBusyId(null);
@@ -226,8 +258,12 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
           recurrence: editRecurrence,
           weekday: Number(editWeekday),
           dayOfMonth: Number(editDayOfMonth),
+          monthOfYear: Number(editMonthOfYear),
+          anchorMonth: Number(editAnchorMonth),
+          specificDate: editSpecificDate || undefined,
           reminderEnabled: editReminder,
           reminderTime: editReminder ? editReminderTime : null,
+          assigneeIds: editAssignees,
         }),
       });
       const d = await res.json();
@@ -235,25 +271,15 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
         flash(false, d?.error ?? "Save failed");
         return;
       }
-      setTasks((ts) =>
-        ts.map((t) =>
-          t.id === editTarget.id
-            ? {
-                ...t,
-                title: editTitle.trim(),
-                description: editDesc || null,
-                recurrence: editRecurrence,
-                weekday: editRecurrence === "WEEKLY" ? Number(editWeekday) : null,
-                dayOfMonth: editRecurrence === "MONTHLY" ? Number(editDayOfMonth) : null,
-                reminderEnabled: editReminder,
-                reminderTime: editReminder ? editReminderTime : null,
-              }
-            : t
-        )
-      );
       setEditTarget(null);
       flash(true, "Task updated");
       router.refresh();
+      // Re-pull the list so assignee/log changes are reflected.
+      const list = await fetch(apiPath("/api/tasks"), { cache: "no-store" });
+      if (list.ok) {
+        const data = await list.json();
+        if (Array.isArray(data.tasks)) setTasks(data.tasks);
+      }
     } finally {
       setBusyId(null);
     }
@@ -261,8 +287,9 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
 
   function openLog(t: Task) {
     setLogTarget(t);
-    setLogMinutes("30");
+    setLogMinutes(String(t.currentLog?.minutes || 30));
     setLogNote(t.currentLog?.note ?? "");
+    setLogDate(todayIST());
   }
 
   function openEdit(t: Task) {
@@ -272,11 +299,25 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
     setEditRecurrence(t.recurrence);
     setEditWeekday(String(t.weekday ?? 1));
     setEditDayOfMonth(String(t.dayOfMonth ?? 1));
+    setEditMonthOfYear(String(t.monthOfYear ?? new Date().getMonth() + 1));
+    setEditAnchorMonth(String(t.anchorMonth ?? new Date().getMonth() + 1));
+    setEditSpecificDate(
+      t.specificDate ? t.specificDate.slice(0, 10) : ""
+    );
     setEditReminder(t.reminderEnabled);
     setEditReminderTime(t.reminderTime ?? "09:00");
+    setEditAssignees(t.assignees.map((a) => a.id));
   }
 
   const totalThisPeriod = tasks.reduce((s, t) => s + (t.currentLog?.minutes ?? 0), 0);
+  const canEditSchedule = (t: Task) => t.isCreator;
+
+  const showDay = ["MONTHLY", "QUARTERLY", "HALF_YEARLY", "YEARLY"].includes(editRecurrence);
+  const MONTHS = [
+    "", "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ];
+  const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
   return (
     <div className="space-y-4">
@@ -292,20 +333,22 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
 
       {tasks.length > 0 && (
         <p className="text-sm text-muted-foreground">
-          Time logged this period across all tasks:{" "}
+          Time you logged this period across all tasks:{" "}
           <span className="font-semibold text-foreground">{fmtMinutes(totalThisPeriod)}</span>
         </p>
       )}
 
       {tasks.length === 0 ? (
         <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">
-          No recurring tasks yet. Create your first daily, weekly or monthly task.
+          No tasks yet. Create a daily, weekly, monthly, quarterly, half-yearly, yearly or one-time task.
         </div>
       ) : (
         <div className="space-y-3">
           {tasks.map((t) => {
             const status = t.currentLog?.status ?? "PENDING";
             const expanded = expandedId === t.id;
+            // Current-period logs from every participant (for the team view).
+            const currentPeriodLogs = t.logs.filter((l) => l.periodKey === t.currentPeriod);
             return (
               <div
                 key={t.id}
@@ -322,19 +365,56 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
                       {!t.active && <Badge variant="secondary">Paused</Badge>}
                       {t.currentLog?.minutes ? (
                         <span className="text-xs text-muted-foreground">
-                          {t.currentLog.minutes} min logged
+                          you: {t.currentLog.minutes} min
                         </span>
                       ) : null}
                     </div>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {scheduleText(t)}
-                      {t.currentLog?.periodKey ? ` · period ${t.currentLog.periodKey}` : ""}
+                      {t.scheduleText}
+                      {t.currentPeriod ? ` · period ${t.currentPeriod}` : ""}
                       {t.reminderEnabled
                         ? ` · reminder at ${t.reminderTime ?? "09:00"} IST`
                         : " · reminders off"}
                     </p>
                     {t.description && (
                       <p className="mt-1 text-sm text-muted-foreground">{t.description}</p>
+                    )}
+
+                    {(t.participants?.length ?? 0) > 1 && (
+                      <p className="mt-1.5 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                        <Users className="h-3 w-3" />
+                        {t.participants.map((p, i) => (
+                          <span key={p.id}>
+                            {i > 0 && ", "}
+                            <span className={p.id === meId ? "font-medium text-foreground" : ""}>
+                              {p.id === meId ? "You" : p.name}
+                            </span>
+                          </span>
+                        ))}
+                      </p>
+                    )}
+
+                    {/* Who has logged this period (team visibility). */}
+                    {currentPeriodLogs.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {currentPeriodLogs.map((l) => (
+                          <span
+                            key={l.id}
+                            className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs"
+                            title={l.note ?? undefined}
+                          >
+                            <span className="font-medium">
+                              {l.userId === meId ? "You" : l.user?.name ?? "—"}
+                            </span>
+                            <Badge variant={STATUS_BADGE[l.status] ?? "outline"} className="px-1 py-0 text-[10px]">
+                              {STATUS_LABEL[l.status] ?? l.status}
+                            </Badge>
+                            {l.status === "COMPLETED" && l.minutes > 0 && (
+                              <span className="text-muted-foreground">{l.minutes}m</span>
+                            )}
+                          </span>
+                        ))}
+                      </div>
                     )}
 
                     <button
@@ -354,20 +434,21 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
 
                     {expanded && (
                       <div className="mt-2 overflow-x-auto rounded-md border">
-                        <table className="w-full min-w-[420px] text-left text-xs">
+                        <table className="w-full min-w-[520px] text-left text-xs">
                           <thead className="bg-muted/40 text-muted-foreground">
                             <tr>
                               <th className="px-2 py-1.5 font-medium">Period</th>
+                              <th className="px-2 py-1.5 font-medium">Who</th>
                               <th className="px-2 py-1.5 font-medium">Status</th>
                               <th className="px-2 py-1.5 font-medium">Time</th>
                               <th className="px-2 py-1.5 font-medium">Logged</th>
-                              <th className="px-2 py-1.5 font-medium">Note</th>
+                              <th className="px-2 py-1.5 font-medium">Comment</th>
                             </tr>
                           </thead>
                           <tbody>
                             {t.logs.length === 0 && (
                               <tr>
-                                <td colSpan={5} className="px-2 py-2 text-muted-foreground">
+                                <td colSpan={6} className="px-2 py-2 text-muted-foreground">
                                   No history yet.
                                 </td>
                               </tr>
@@ -375,6 +456,9 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
                             {t.logs.map((l) => (
                               <tr key={l.id} className="border-t">
                                 <td className="whitespace-nowrap px-2 py-1.5">{periodLabel(l.periodKey)}</td>
+                                <td className="whitespace-nowrap px-2 py-1.5">
+                                  {l.userId === meId ? "You" : l.user?.name ?? "—"}
+                                </td>
                                 <td className="px-2 py-1.5">
                                   <Badge variant={STATUS_BADGE[l.status] ?? "outline"}>
                                     {STATUS_LABEL[l.status] ?? l.status}
@@ -406,7 +490,7 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
                   </div>
 
                   <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-                    {t.active && status === "PENDING" && (
+                    {t.active && (
                       <>
                         <Button size="sm" onClick={() => openLog(t)} disabled={busyId === t.id}>
                           <Clock className="mr-1 h-3 w-3" /> Log time
@@ -414,7 +498,7 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
                         <Button
                           size="sm"
                           variant="secondary"
-                          onClick={() => postLog(t, "COMPLETED", 0, "Completed")}
+                          onClick={() => postLog(t, "COMPLETED", 0, "")}
                           disabled={busyId === t.id}
                         >
                           <CheckCircle2 className="mr-1 h-3 w-3" /> Done
@@ -436,7 +520,7 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
                         variant="ghost"
                         onClick={() => postLog(t, "PENDING")}
                         disabled={busyId === t.id}
-                        title="Reopen this period"
+                        title="Reopen this period for you"
                       >
                         Reopen
                       </Button>
@@ -452,17 +536,21 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
                         Resume
                       </Button>
                     )}
-                    <Button variant="ghost" size="sm" onClick={() => openEdit(t)} title="Edit task">
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setRemoveTarget(t)}
-                      title={t.active ? "Pause task" : "Delete task"}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    {canEditSchedule(t) && (
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(t)} title="Edit task">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    {t.isCreator && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setRemoveTarget(t)}
+                        title={t.active ? "Pause task" : "Delete task"}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -471,16 +559,31 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
         </div>
       )}
 
-      {/* Log time dialog */}
+      {/* Log time dialog — supports past dates (backfill with a comment). */}
       <Dialog open={logTarget !== null} onOpenChange={(o) => !o && setLogTarget(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Log time — {logTarget?.title}</DialogTitle>
             <DialogDescription>
-              Record minutes spent on this task for the current period ({logTarget?.currentLog?.periodKey ?? "now"}).
+              Record minutes and a comment. You can pick a past date to backfill work you missed.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="log-date">Date</Label>
+              <Input
+                id="log-date"
+                type="date"
+                max={todayIST()}
+                value={logDate}
+                onChange={(e) => setLogDate(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                {logDate === todayIST()
+                  ? `Today — maps to period ${logTarget?.currentPeriod ?? ""}`
+                  : `Past date — the comment explains what was done then.`}
+              </p>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="log-minutes">Minutes</Label>
               <Input
@@ -506,7 +609,7 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="log-note">Note (optional)</Label>
+              <Label htmlFor="log-note">Comment {logDate !== todayIST() ? "(required for past dates)" : "(optional)"}</Label>
               <Textarea
                 id="log-note"
                 rows={2}
@@ -523,7 +626,11 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
             <Button
               onClick={async () => {
                 if (!logTarget) return;
-                await postLog(logTarget, "COMPLETED", Number(logMinutes) || 0, logNote);
+                if (logDate !== todayIST() && !logNote.trim()) {
+                  flash(false, "Add a comment explaining the past-date entry.");
+                  return;
+                }
+                await postLog(logTarget, "COMPLETED", Number(logMinutes) || 0, logNote, logDate);
                 setLogTarget(null);
               }}
               disabled={busyId === logTarget?.id}
@@ -540,7 +647,7 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Edit task</DialogTitle>
-            <DialogDescription>Update the title, schedule, description and reminder.</DialogDescription>
+            <DialogDescription>Update the title, schedule, assignees and reminder.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-2">
@@ -555,9 +662,11 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="DAILY">Daily</SelectItem>
-                    <SelectItem value="WEEKLY">Weekly</SelectItem>
-                    <SelectItem value="MONTHLY">Monthly</SelectItem>
+                    {Object.entries(REC_LABELS).map(([v, l]) => (
+                      <SelectItem key={v} value={v}>
+                        {l}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -578,7 +687,18 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
                   </Select>
                 </div>
               )}
-              {editRecurrence === "MONTHLY" && (
+              {editRecurrence === "ONE_TIME" && (
+                <div className="space-y-2">
+                  <Label htmlFor="edit-specific">Due date</Label>
+                  <Input
+                    id="edit-specific"
+                    type="date"
+                    value={editSpecificDate}
+                    onChange={(e) => setEditSpecificDate(e.target.value)}
+                  />
+                </div>
+              )}
+              {showDay && (
                 <div className="space-y-2">
                   <Label htmlFor="edit-dom">Day of month (1–31)</Label>
                   <Input
@@ -589,6 +709,40 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
                     value={editDayOfMonth}
                     onChange={(e) => setEditDayOfMonth(e.target.value)}
                   />
+                </div>
+              )}
+              {editRecurrence === "YEARLY" && (
+                <div className="space-y-2">
+                  <Label>Month</Label>
+                  <Select value={editMonthOfYear} onValueChange={setEditMonthOfYear}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MONTHS.slice(1).map((m, i) => (
+                        <SelectItem key={i + 1} value={String(i + 1)}>
+                          {m}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {(editRecurrence === "QUARTERLY" || editRecurrence === "HALF_YEARLY") && (
+                <div className="space-y-2">
+                  <Label>Cycle starts in</Label>
+                  <Select value={editAnchorMonth} onValueChange={setEditAnchorMonth}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MONTHS.slice(1).map((m, i) => (
+                        <SelectItem key={i + 1} value={String(i + 1)}>
+                          {m}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
             </div>
@@ -602,9 +756,44 @@ export function TasksClient({ initialTasks }: { initialTasks: Task[] }) {
               />
             </div>
             <div className="rounded-lg border p-3">
+              <Label className="text-sm font-medium">Assign to</Label>
+              <p className="mb-2 text-xs text-muted-foreground">
+                Assigned people can each log time and comments for this task.
+              </p>
+              {users.filter((u) => u.id !== meId).length === 0 ? (
+                <p className="text-sm text-muted-foreground">No other users yet.</p>
+              ) : (
+                <div className="max-h-40 space-y-1.5 overflow-y-auto">
+                  {users
+                    .filter((u) => u.id !== meId)
+                    .map((u) => (
+                      <label
+                        key={u.id}
+                        className="flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 text-sm hover:bg-muted/40"
+                      >
+                        <Checkbox
+                          checked={editAssignees.includes(u.id)}
+                          onCheckedChange={() =>
+                            setEditAssignees((ids) =>
+                              ids.includes(u.id) ? ids.filter((x) => x !== u.id) : [...ids, u.id]
+                            )
+                          }
+                        />
+                        <span className="min-w-0 flex-1 truncate">
+                          {u.name}{" "}
+                          <span className="text-xs text-muted-foreground">
+                            (@{u.username} · {u.role})
+                          </span>
+                        </span>
+                      </label>
+                    ))}
+                </div>
+              )}
+            </div>
+            <div className="rounded-lg border p-3">
               <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
                 <Checkbox checked={editReminder} onCheckedChange={(v) => setEditReminder(v === true)} />
-                Remind me when due
+                Remind participants when due
               </label>
               {editReminder && (
                 <div className="mt-3 max-w-[12rem] space-y-1.5">

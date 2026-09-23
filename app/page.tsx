@@ -55,12 +55,22 @@ export default async function DashboardPage() {
       // (Reminders are pushed once per period by AppShell → sendDueReminders.)
       await syncTaskLogs(me.id);
       const ts = await prisma.recurringTask.findMany({
-        where: { userId: me.id, active: true },
-        include: { logs: { orderBy: { periodKey: "desc" }, take: 3 } },
+        where: {
+          active: true,
+          OR: [{ userId: me.id }, { assignees: { some: { userId: me.id } } }],
+        },
+        include: { logs: { where: { userId: me.id }, orderBy: { periodKey: "desc" }, take: 3 } },
       });
       return ts
         .map((t) => {
-          const cur = periodKeyFor(t.recurrence as any);
+          const cur = periodKeyFor({
+            recurrence: t.recurrence,
+            weekday: t.weekday,
+            dayOfMonth: t.dayOfMonth,
+            monthOfYear: t.monthOfYear,
+            anchorMonth: t.anchorMonth,
+            specificDate: t.specificDate,
+          });
           const current = t.logs.find((l) => l.periodKey === cur) ?? null;
           return { task: t, current };
         })
@@ -129,7 +139,7 @@ export default async function DashboardPage() {
                 />
                 <span className="font-medium">{task.title}</span>
                 <span className="text-xs opacity-75">
-                  {task.recurrence === "DAILY" ? "daily" : task.recurrence === "WEEKLY" ? "weekly" : "monthly"}
+                  {String(task.recurrence).toLowerCase().replace("_", "-")}
                   {" · "}
                   {current!.status === "MISSED" ? "missed" : "due now"} ({current!.periodKey})
                 </span>
