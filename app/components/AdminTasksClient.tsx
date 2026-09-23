@@ -338,10 +338,21 @@ export function AdminTasksClient() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium">{t.title}</span>
+                        <a
+                          href={apiPath(`/admin/tasks/${t.id}`)}
+                          className="font-medium text-primary hover:underline"
+                        >
+                          {t.title}
+                        </a>
                         <Badge variant="outline">{REC[t.recurrence] ?? t.recurrence}</Badge>
                         <Badge variant={STATUS_BADGE[st] ?? "outline"}>{STATUS_LABEL[st] ?? st}</Badge>
                         {!t.active && <Badge variant="secondary">Paused</Badge>}
+                        <a
+                          href={apiPath(`/admin/tasks/${t.id}`)}
+                          className="text-xs font-medium text-primary hover:underline"
+                        >
+                          Audit &amp; calendar →
+                        </a>
                       </div>
                       <p className="mt-0.5 text-xs text-muted-foreground">
                         by {t.user.name} (@{t.user.username})

@@ -70,6 +70,8 @@ model AppUser {
   recurringTasks RecurringTask[] // tasks this user created
   taskAssignments TaskAssignee[] // tasks assigned to this user
   taskLogs       RecurringTaskLog[] // work logs this user has entered
+  taskLogUploads TaskLogAttachment[] // PDFs this user uploaded on task logs
+  taskLogEvents  TaskLogEvent[] // audit rows this user produced
 }
 
 model Category {
@@ -302,6 +304,7 @@ model RecurringTask {
   updatedAt       DateTime         @updatedAt
   assignees       TaskAssignee[]
   logs            RecurringTaskLog[]
+  events          TaskLogEvent[]
   @@index([userId, active])
 }
 
@@ -335,9 +338,43 @@ model RecurringTaskLog {
   remindedAt DateTime?
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
+  attachments TaskLogAttachment[]
   @@unique([taskId, periodKey, userId])
   @@index([taskId, periodKey])
   @@index([userId, periodKey])
+}
+
+// Mandatory PDF (≤1 MB) attached when a participant closes/completes a day.
+model TaskLogAttachment {
+  id           String           @id @default(uuid())
+  logId        String
+  log          RecurringTaskLog @relation(fields: [logId], references: [id], onDelete: Cascade)
+  name         String
+  mime         String // application/pdf
+  size         Int
+  data         Bytes
+  uploadedById String
+  uploadedBy   AppUser          @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+  createdAt    DateTime         @default(now())
+  @@index([logId])
+}
+
+// Immutable audit trail: who updated what on a task log, and when.
+model TaskLogEvent {
+  id        String        @id @default(uuid())
+  taskId    String
+  task      RecurringTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  logId     String? // set when the event targets a specific log row
+  userId    String // who performed the action
+  user      AppUser       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  periodKey String?
+  type      String // CREATED | UPDATED | ATTACHMENT | CLEARED | ASSIGNEES
+  message   String // human-readable "what changed"
+  minutes   Int?
+  status    String?
+  createdAt DateTime      @default(now())
+  @@index([taskId, createdAt])
+  @@index([logId])
 }
 
 model Notification {

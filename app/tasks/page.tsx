@@ -133,11 +133,17 @@ export default async function TasksPage() {
           <h1 className="iipe-page-title">My Tasks</h1>
           <p className="iipe-page-sub">
             Daily to yearly (and one-time) work — log time against any period, including past dates with comments.
+            Closing a day requires a proof PDF (max 1 MB).
           </p>
         </div>
-        <a href={apiPath("/tasks/new")} className="iipe-btn">
-          + New task
-        </a>
+        <div className="flex flex-wrap gap-2">
+          <a href={apiPath("/tasks/monitor")} className="iipe-btn">
+            Task monitor
+          </a>
+          <a href={apiPath("/tasks/new")} className="iipe-btn">
+            + New task
+          </a>
+        </div>
       </div>
 
       <div className="mb-4 grid gap-4 sm:grid-cols-3">

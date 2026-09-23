@@ -29,10 +29,15 @@ export default async function AdminTasksPage() {
       <div className="mb-3">
         <Breadcrumb items={[{ label: "App Admin Console", href: "/admin" }, { label: "Task Oversight" }]} />
       </div>
-      <h1 className="iipe-page-title">Task Oversight</h1>
-      <p className="iipe-page-sub">
-        Every task across users — who logged, how much time, how frequently work is happening, and who missed periods.
-      </p>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="iipe-page-title">Task Oversight</h1>
+          <p className="iipe-page-sub">
+            Every task across users — who logged, how much time, how frequently work is happening, and who missed periods.
+            Open a task for per-person calendars, PDFs, and the full audit trail.
+          </p>
+        </div>
+      </div>
       <div className="mt-4">
         <AdminTasksClient />
       </div>

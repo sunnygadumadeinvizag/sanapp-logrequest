@@ -145,6 +145,7 @@ export function TasksClient({
   const [logMinutes, setLogMinutes] = useState("30");
   const [logNote, setLogNote] = useState("");
   const [logDate, setLogDate] = useState(todayIST());
+  const [logFile, setLogFile] = useState<File | null>(null);
 
   // Edit dialog state
   const [editTarget, setEditTarget] = useState<Task | null>(null);
@@ -189,19 +190,36 @@ export function TasksClient({
     status: string,
     minutes = 0,
     note = "",
-    date?: string
+    date?: string,
+    file?: File | null
   ) {
     setBusyId(task.id);
     try {
-      const res = await fetch(apiPath(`/api/tasks/${task.id}/log`), {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ status, minutes, note, date: date || undefined }),
-      });
+      let res: Response;
+      if (status === "COMPLETED" && file) {
+        const fd = new FormData();
+        fd.set("status", status);
+        fd.set("minutes", String(minutes));
+        fd.set("note", note);
+        if (date) fd.set("date", date);
+        fd.set("file", file);
+        res = await fetch(apiPath(`/api/tasks/${task.id}/log`), { method: "POST", body: fd });
+      } else {
+        res = await fetch(apiPath(`/api/tasks/${task.id}/log`), {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ status, minutes, note, date: date || undefined }),
+        });
+      }
       const d = await res.json();
       if (!res.ok) {
-        flash(false, d?.error ?? "Could not save log");
-        return;
+        flash(
+          false,
+          d?.error === "pdf_required"
+            ? "PDF required to close this day (max 1 MB)."
+            : (d?.error ?? "Could not save log")
+        );
+        return false;
       }
       applyLog(task.id, d.log);
       flash(
@@ -211,6 +229,7 @@ export function TasksClient({
           : "Updated"
       );
       router.refresh();
+      return true;
     } finally {
       setBusyId(null);
     }
@@ -290,6 +309,7 @@ export function TasksClient({
     setLogMinutes(String(t.currentLog?.minutes || 30));
     setLogNote(t.currentLog?.note ?? "");
     setLogDate(todayIST());
+    setLogFile(null);
   }
 
   function openEdit(t: Task) {
@@ -368,6 +388,24 @@ export function TasksClient({
                           you: {t.currentLog.minutes} min
                         </span>
                       ) : null}
+                      <a
+                        href={apiPath(`/tasks/${t.id}`)}
+                        className="text-xs font-medium text-primary hover:underline"
+                      >
+                        Detail
+                      </a>
+                      <a
+                        href={apiPath(`/tasks/${t.id}/calendar`)}
+                        className="text-xs font-medium text-primary hover:underline"
+                      >
+                        Calendar
+                      </a>
+                      <a
+                        href={apiPath("/tasks/monitor")}
+                        className="text-xs font-medium text-primary hover:underline"
+                      >
+                        Monitor
+                      </a>
                     </div>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {t.scheduleText}
@@ -498,8 +536,9 @@ export function TasksClient({
                         <Button
                           size="sm"
                           variant="secondary"
-                          onClick={() => postLog(t, "COMPLETED", 0, "")}
+                          onClick={() => openLog(t)}
                           disabled={busyId === t.id}
+                          title="Close this day — PDF required (max 1 MB)"
                         >
                           <CheckCircle2 className="mr-1 h-3 w-3" /> Done
                         </Button>
@@ -565,7 +604,7 @@ export function TasksClient({
           <DialogHeader>
             <DialogTitle>Log time — {logTarget?.title}</DialogTitle>
             <DialogDescription>
-              Record minutes and a comment. You can pick a past date to backfill work you missed.
+              Record minutes and a comment. Closing the day requires a proof PDF (max 1 MB). Sunday and past dates are allowed.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -618,6 +657,35 @@ export function TasksClient({
                 placeholder="What did you do?"
               />
             </div>
+            <div className="space-y-2 rounded-lg border border-dashed p-3">
+              <Label htmlFor="log-pdf">Proof PDF (required to close) — max 1 MB</Label>
+              <Input
+                id="log-pdf"
+                type="file"
+                accept="application/pdf,.pdf"
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  if (f && f.size > 1024 * 1024) {
+                    flash(false, "PDF must be 1 MB or smaller.");
+                    e.target.value = "";
+                    setLogFile(null);
+                    return;
+                  }
+                  if (f && f.type && f.type !== "application/pdf") {
+                    flash(false, "Only PDF files are allowed.");
+                    e.target.value = "";
+                    setLogFile(null);
+                    return;
+                  }
+                  setLogFile(f);
+                }}
+              />
+              {logFile && (
+                <p className="text-xs text-muted-foreground">
+                  {logFile.name} · {Math.round(logFile.size / 1024)} KB
+                </p>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setLogTarget(null)} disabled={busyId === logTarget?.id}>
@@ -630,13 +698,27 @@ export function TasksClient({
                   flash(false, "Add a comment explaining the past-date entry.");
                   return;
                 }
-                await postLog(logTarget, "COMPLETED", Number(logMinutes) || 0, logNote, logDate);
-                setLogTarget(null);
+                if (!logFile) {
+                  flash(false, "Attach a PDF (max 1 MB) to close this day.");
+                  return;
+                }
+                const ok = await postLog(
+                  logTarget,
+                  "COMPLETED",
+                  Number(logMinutes) || 0,
+                  logNote,
+                  logDate,
+                  logFile
+                );
+                if (ok) {
+                  setLogTarget(null);
+                  setLogFile(null);
+                }
               }}
               disabled={busyId === logTarget?.id}
             >
               {busyId === logTarget?.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
-              Save &amp; complete
+              Save &amp; close day
             </Button>
           </DialogFooter>
         </DialogContent>

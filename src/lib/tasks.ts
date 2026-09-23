@@ -240,6 +240,394 @@ export async function canLogOnTask(
   return count > 0;
 }
 
+/** True when the user may view a task's logs/calendar/audit (incl. POC oversight). */
+export async function canViewTask(
+  task: { id: string; userId: string },
+  me: { id: string; role: string }
+): Promise<boolean> {
+  if (me.role === "ADMIN" || me.role === "POC") return true;
+  return canLogOnTask(task, me);
+}
+
+export const MAX_PDF_BYTES = 1024 * 1024; // 1 MB
+export const ALLOWED_TASK_PDF = "application/pdf";
+
+/** Max calendar days to scan when computing expected/missed dates. */
+export const STATS_WINDOW_DAYS = 366;
+
+/** Every scheduled date (IST YYYY-MM-DD) of a task in [from, to] inclusive. */
+export function expectedScheduledDates(
+  schedule: TaskSchedule,
+  from: Date,
+  to: Date,
+  createdAt?: Date | null
+): string[] {
+  const startMs = Math.max(from.getTime(), (createdAt ?? from).getTime());
+  const endMs = to.getTime();
+  if (endMs < startMs) return [];
+  const out: string[] = [];
+  const max = STATS_WINDOW_DAYS + 1;
+  const dayMs = 86400000;
+  let d = istDateFromString(istDateKey(new Date(startMs))) ?? new Date(startMs);
+  const stop = Date.UTC(
+    new Date(endMs).getUTCFullYear(),
+    new Date(endMs).getUTCMonth(),
+    new Date(endMs).getUTCDate()
+  );
+  while (d.getTime() <= stop && out.length < max) {
+    if (isScheduledDay(schedule, d)) out.push(istDateKey(d));
+    d = new Date(d.getTime() + dayMs);
+  }
+  return out;
+}
+
+type LogLike = {
+  periodKey: string;
+  status: string;
+  minutes: number;
+  logDate?: Date | string | null;
+  note?: string | null;
+  userId?: string;
+  id?: string;
+  loggedAt?: Date | string | null;
+};
+
+function dateKeyFrom(value: Date | string | null | undefined): string {
+  if (!value) return "";
+  if (typeof value === "string") return value.slice(0, 10);
+  return istDateKey(value);
+}
+
+export type TaskStats = {
+  userId: string;
+  from: string;
+  to: string;
+  /** Days (scheduled dates) with a COMPLETED log that has a logDate/period. */
+  daysWorked: number;
+  /** Scheduled dates with no completion and no skip (past dates only). */
+  daysMissed: number;
+  /** Scheduled dates with an explicit SKIPPED log. */
+  daysSkipped: number;
+  /** Scheduled dates still PENDING (including today if unfinished). */
+  daysPending: number;
+  /** Sum of minutes across COMPLETED logs in the window. */
+  totalMinutes: number;
+  /** Per-day minutes for COMPLETED logs (YYYY-MM-DD → minutes). */
+  minutesByDate: Record<string, number>;
+  /** Scheduled dates that were missed (YYYY-MM-DD). */
+  missedDates: string[];
+  /** Scheduled dates that were completed (YYYY-MM-DD). */
+  workedDates: string[];
+  /** Completed logs (raw) for building calendars/details. */
+  completedLogs: Array<{
+    id: string;
+    periodKey: string;
+    minutes: number;
+    note: string | null;
+    logDate: string | null;
+    loggedAt: string | null;
+    hasPdf: boolean;
+    userName?: string;
+    userId: string;
+  }>;
+};
+
+/**
+ * Compute monitoring stats for one participant of a task over a date window
+ * (default: last STATS_WINDOW_DAYS days ending today).
+ */
+export function computeTaskStats(options: {
+  schedule: TaskSchedule;
+  logs: LogLike[];
+  userId: string;
+  from?: Date;
+  to?: Date;
+  createdAt?: Date | null;
+  attachmentsByLogId?: Set<string>;
+}): TaskStats {
+  const { schedule, logs, userId } = options;
+  const now = options.to ?? new Date();
+  const createdAt = options.createdAt ?? null;
+  const earliest =
+    createdAt && createdAt.getTime() > now.getTime() - STATS_WINDOW_DAYS * 86400000
+      ? createdAt
+      : new Date(now.getTime() - (STATS_WINDOW_DAYS - 1) * 86400000);
+  const from = options.from ?? earliest;
+  const mine = logs.filter((l) => l.userId === userId);
+  const todayKey = istDateKey(now);
+
+  // Index completed logs by their work date (logDate, else full-date periodKey).
+  const workDateToLog = new Map<string, LogLike>();
+  const periodToLog = new Map<string, LogLike>();
+  for (const l of mine) {
+    periodToLog.set(l.periodKey, l);
+    if (l.status !== "COMPLETED") continue;
+    const dk = dateKeyFrom(l.logDate);
+    if (dk) workDateToLog.set(dk, l);
+    else if (/^\d{4}-\d{2}-\d{2}$/.test(l.periodKey)) workDateToLog.set(l.periodKey, l);
+  }
+
+  const scheduled = expectedScheduledDates(schedule, from, now, createdAt);
+  const minutesByDate: Record<string, number> = {};
+  const missedDates: string[] = [];
+  const workedDates: string[] = [];
+  let totalMinutes = 0;
+  let daysWorked = 0;
+  let daysMissed = 0;
+  let daysSkipped = 0;
+  let daysPending = 0;
+
+  const markWorked = (day: string, minutes: number) => {
+    if (!minutesByDate[day]) {
+      minutesByDate[day] = 0;
+      workedDates.push(day);
+      daysWorked += 1;
+    }
+    minutesByDate[day] += minutes;
+    totalMinutes += minutes;
+  };
+
+  for (const day of scheduled) {
+    const dayDate = istDateFromString(day) ?? now;
+    const period = periodKeyFor(schedule, dayDate);
+    const isPast = day < todayKey;
+    const exactLog = workDateToLog.get(day);
+    const periodLog = periodToLog.get(period) ?? periodToLog.get(day) ?? null;
+
+    // Prefer the log whose work day is this date (daily/weekly/monthly logDate).
+    if (exactLog && exactLog.status === "COMPLETED") {
+      markWorked(day, exactLog.minutes);
+      continue;
+    }
+
+    // Multi-day period (monthly etc.) with no explicit work date: attribute
+    // the hours to the scheduled day of the period only.
+    if (
+      periodLog &&
+      periodLog.status === "COMPLETED" &&
+      !dateKeyFrom(periodLog.logDate) &&
+      isScheduledDay(schedule, dayDate) &&
+      periodLog.periodKey === period
+    ) {
+      markWorked(day, periodLog.minutes);
+      continue;
+    }
+
+    if (periodLog && periodLog.status === "SKIPPED") {
+      daysSkipped += 1;
+      continue;
+    }
+    if (periodLog && periodLog.status === "PENDING") {
+      if (isPast) {
+        missedDates.push(day);
+        daysMissed += 1;
+      } else {
+        daysPending += 1;
+      }
+      continue;
+    }
+    if (exactLog && exactLog.status === "COMPLETED") {
+      markWorked(day, exactLog.minutes);
+      continue;
+    }
+    if (isPast) {
+      // Completed only under a different period match already handled above.
+      const completedCover =
+        periodLog?.status === "COMPLETED" &&
+        dateKeyFrom(periodLog.logDate) &&
+        dateKeyFrom(periodLog.logDate) !== day &&
+        !isScheduledDay(schedule, dayDate);
+      if (!completedCover) {
+        missedDates.push(day);
+        daysMissed += 1;
+      }
+    } else {
+      daysPending += 1;
+    }
+  }
+
+  const completedLogs = mine
+    .filter((l) => l.status === "COMPLETED")
+    .map((l) => ({
+      id: l.id ?? l.periodKey,
+      periodKey: l.periodKey,
+      minutes: l.minutes,
+      note: l.note ?? null,
+      logDate: dateKeyFrom(l.logDate) || (/^\d{4}-\d{2}-\d{2}$/.test(l.periodKey) ? l.periodKey : null),
+      loggedAt: l.loggedAt
+        ? typeof l.loggedAt === "string"
+          ? l.loggedAt
+          : new Date(l.loggedAt).toISOString()
+        : null,
+      hasPdf: options.attachmentsByLogId?.has(l.id ?? "") ?? false,
+      userId,
+    }))
+    .sort((a, b) =>
+      (b.logDate ?? b.periodKey).localeCompare(a.logDate ?? a.periodKey)
+    );
+
+  return {
+    userId,
+    from: istDateKey(from),
+    to: todayKey,
+    daysWorked,
+    daysMissed,
+    daysSkipped,
+    daysPending,
+    totalMinutes,
+    minutesByDate,
+    missedDates: [...missedDates].sort(),
+    workedDates: [...workedDates].sort(),
+    completedLogs,
+  };
+}
+
+/** True when `day` is the canonical scheduled day (not merely inside a period). */
+function isScheduledOnExactly(schedule: TaskSchedule, day: string): boolean {
+  const d = istDateFromString(day);
+  return d ? isScheduledDay(schedule, d) : false;
+}
+
+export type CalendarDay = {
+  date: string; // YYYY-MM-DD
+  scheduled: boolean;
+  status: string | null; // COMPLETED | PENDING | MISSED | SKIPPED for the viewing user
+  minutes: number;
+  note: string | null;
+  logId: string | null;
+  periodKey: string | null;
+  hasPdf: boolean;
+  loggedAt: string | null;
+};
+
+/**
+ * Build a month grid (IST) for a task. Hours for multi-day periods appear on
+ * the work/log day when available, otherwise on each scheduled day of the period.
+ */
+export function buildTaskCalendar(options: {
+  schedule: TaskSchedule;
+  logs: LogLike[];
+  userId: string;
+  month: string; // YYYY-MM
+  attachmentsByLogId?: Map<string, number>;
+}): CalendarDay[] {
+  const [y, m] = options.month.split("-").map((n) => parseInt(n, 10));
+  if (!y || !m) return [];
+  const first = new Date(Date.UTC(y, m - 1, 1));
+  const next = new Date(Date.UTC(m === 12 ? y + 1 : y, m === 12 ? 0 : m, 1));
+  const mine = options.logs.filter((l) => l.userId === options.userId);
+  const byPeriod = new Map<string, LogLike>();
+  const byWorkDate = new Map<string, LogLike>();
+  for (const l of mine) {
+    byPeriod.set(l.periodKey, l);
+    if (l.status === "COMPLETED") {
+      const dk = dateKeyFrom(l.logDate);
+      if (dk) byWorkDate.set(dk, l);
+      else byPeriod.set(l.periodKey, l);
+    }
+  }
+
+  const days: CalendarDay[] = [];
+  const todayKey = istDateKey();
+  let cursor = first.getTime();
+  while (cursor < next.getTime()) {
+    const d = new Date(cursor);
+    const date = istDateKey(d);
+    const scheduled = isScheduledDay(options.schedule, d);
+    const period = periodKeyFor(options.schedule, d);
+    const log =
+      byWorkDate.get(date) ??
+      byPeriod.get(period) ??
+      byPeriod.get(date) ??
+      null;
+    let status: string | null = null;
+    let minutes = 0;
+    let note: string | null = null;
+    let logId: string | null = null;
+    let hasPdf = false;
+    let loggedAt: string | null = null;
+
+    if (log) {
+      status = log.status;
+      minutes = log.status === "COMPLETED" ? log.minutes : 0;
+      note = log.note ?? null;
+      logId = log.id ?? null;
+      loggedAt = dateKeyFrom(log.loggedAt)
+        ? typeof log.loggedAt === "string"
+          ? log.loggedAt
+          : new Date(log.loggedAt as Date).toISOString()
+        : null;
+      if (log.id) hasPdf = (options.attachmentsByLogId?.get(log.id) ?? 0) > 0;
+      // Attribute multi-day period hours to every scheduled day of the period
+      // when no explicit work date is set (so monthly shows the hours once).
+      if (status === "COMPLETED" && !dateKeyFrom(log.logDate) && scheduled && log.periodKey === period) {
+        minutes = log.minutes;
+      } else if (dateKeyFrom(log.logDate) && dateKeyFrom(log.logDate) !== date) {
+        // Hours live on the work day only.
+        minutes = dateKeyFrom(log.logDate) === date ? log.minutes : 0;
+        if (minutes === 0 && scheduled && log.periodKey === period && options.schedule.recurrence === "DAILY") {
+          minutes = 0;
+        }
+      }
+    } else if (scheduled) {
+      status = date < todayKey ? "MISSED" : "PENDING";
+    }
+
+    days.push({
+      date,
+      scheduled,
+      status,
+      minutes,
+      note,
+      logId,
+      periodKey: log?.periodKey ?? (scheduled ? period : null),
+      hasPdf,
+      loggedAt,
+    });
+    cursor += 86400000;
+  }
+  return days;
+}
+
+/** Summarise hours for a set of minutes (e.g. "2h 15m"). */
+export function formatMinutes(total: number): string {
+  if (!total) return "0m";
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h && m) return `${h}h ${m}m`;
+  if (h) return `${h}h`;
+  return `${m}m`;
+}
+
+/** Record an audit row for a task-log action. Best-effort. */
+export async function logTaskEvent(data: {
+  taskId: string;
+  logId?: string | null;
+  userId: string;
+  periodKey?: string | null;
+  type: "CREATED" | "UPDATED" | "ATTACHMENT" | "CLEARED" | "ASSIGNEES";
+  message: string;
+  minutes?: number | null;
+  status?: string | null;
+}): Promise<void> {
+  try {
+    await prisma.taskLogEvent.create({
+      data: {
+        taskId: data.taskId,
+        logId: data.logId ?? null,
+        userId: data.userId,
+        periodKey: data.periodKey ?? null,
+        type: data.type,
+        message: data.message,
+        minutes: data.minutes ?? null,
+        status: data.status ?? null,
+      },
+    });
+  } catch (e) {
+    console.error("logTaskEvent failed:", e);
+  }
+}
+
 /**
  * Ensure a PENDING log exists for every participant on the task's current
  * period, and mark overdue PENDING logs from earlier periods as MISSED.
