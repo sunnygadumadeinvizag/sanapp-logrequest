@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "sanapp-common-ui/styles.css";
 import "./globals.css";
+import "./ui-polish.css";
 import { ThemeScript } from "sanapp-common-ui";
 
 export const metadata: Metadata = {

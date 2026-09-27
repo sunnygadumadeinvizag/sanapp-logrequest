@@ -1,0 +1,255 @@
+/* =====================================================================
+   UI polish layer — ADDITIVE ONLY.
+
+   Imported from app/layout.tsx *after* sanapp-common-ui/styles.css and
+   app/globals.css, so these declarations land last in the cascade and can
+   refine the platform defaults without editing the shared design system
+   (which every other app on the platform also bundles).
+
+   Every rule below either adds a property or is scoped to a viewport band
+   the design system left open:
+     · >=1536px / >=1920px   large and ultra-wide screens
+     · 769-1023px            tablet band
+     · <=768px / <=480px     phone
+     · (pointer: coarse)     touch hit areas
+   No existing declaration is removed or loosened.
+   ===================================================================== */
+
+/* ---------- Fluid page gutters (smooth 12px -> 32px, no hard step) ---- */
+.iipe-container {
+  padding-inline: clamp(12px, 1.5vw, 32px);
+}
+
+/* ---------- Tablet band 769-1023px: give the content more room -------- */
+@media (min-width: 769px) and (max-width: 1023px) {
+  .iipe-shell {
+    gap: 18px;
+  }
+  .iipe-sidebar {
+    width: 184px;
+  }
+  .iipe-sidebar-item {
+    padding: 8px 10px;
+    font-size: 0.88rem;
+  }
+  .iipe-sidebar-app {
+    padding: 7px 10px;
+    font-size: 0.8rem;
+  }
+  .iipe-sidebar-heading {
+    padding: 7px 10px 3px;
+  }
+}
+
+/* ---------- Desktop & large screens ---------------------------------- */
+@media (min-width: 1024px) {
+  .iipe-shell {
+    gap: 28px;
+  }
+  /* The nav rail keeps up with long pages instead of scrolling away, and
+     scrolls internally when it is taller than the viewport. */
+  .iipe-sidebar {
+    position: sticky;
+    top: calc(var(--iipe-header-height) + 16px);
+    max-height: calc(100dvh - var(--iipe-header-height) - 32px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+@media (min-width: 1536px) {
+  .iipe-shell {
+    gap: 32px;
+    margin: 34px 0;
+  }
+  .iipe-sidebar {
+    width: 240px;
+  }
+  .iipe-card {
+    padding: 24px;
+  }
+  .iipe-page-title {
+    font-size: 1.6rem;
+  }
+  .iipe-page-sub {
+    font-size: 1rem;
+  }
+  .iipe-table {
+    font-size: 0.94rem;
+  }
+  .iipe-table th,
+  .iipe-table td {
+    padding: 12px 14px;
+  }
+  .iipe-grid {
+    gap: 22px;
+  }
+}
+
+@media (min-width: 1920px) {
+  /* Ultra-wide: cap the working area, and let card grids use the width as
+     more (narrower) columns instead of very long stretched cards. */
+  .iipe-container {
+    max-width: 1840px;
+  }
+  .iipe-grid-2 {
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  }
+}
+
+/* ---------- Phone ---------------------------------------------------- */
+@media (max-width: 768px) {
+  .iipe-shell {
+    margin: 14px 0;
+  }
+  .iipe-sidebar-item {
+    min-height: 38px;
+  }
+  .iipe-sidebar:not(.collapsed) .iipe-sidebar-item {
+    display: inline-flex;
+    align-items: center;
+  }
+  .iipe-page-title {
+    font-size: 1.3rem;
+    margin: 18px 0 5px;
+  }
+  .iipe-page-sub {
+    font-size: 0.9rem;
+    margin-bottom: 16px;
+  }
+  .iipe-card {
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+  .iipe-table {
+    font-size: 0.85rem;
+  }
+  .iipe-table th,
+  .iipe-table td {
+    padding: 8px 10px;
+  }
+  /* Breadcrumbs stay on one line and scroll instead of wrapping over
+     three rows and pushing the page title down. */
+  .iipe-breadcrumb {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
+    margin: 12px 0 10px;
+  }
+  .iipe-breadcrumb::-webkit-scrollbar {
+    display: none;
+  }
+  .iipe-footer-grid {
+    gap: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .iipe-card {
+    padding: 12px;
+  }
+  .iipe-table th,
+  .iipe-table td {
+    padding: 7px 9px;
+  }
+  .iipe-alert {
+    padding: 10px 12px;
+  }
+}
+
+/* ---------- Touch devices: roomier hit areas (mouse unaffected) ------ */
+@media (pointer: coarse) {
+  .iipe-btn {
+    min-height: 42px;
+    padding-inline: 16px;
+  }
+  .iipe-btn.ghost {
+    padding-inline: 12px;
+  }
+  .iipe-input,
+  .iipe-select,
+  .iipe-textarea {
+    min-height: 42px;
+  }
+  .iipe-nav-item {
+    display: inline-flex;
+    align-items: center;
+  }
+  .iipe-sidebar-item {
+    min-height: 42px;
+  }
+  .iipe-sidebar:not(.collapsed) .iipe-sidebar-item {
+    display: inline-flex;
+    align-items: center;
+  }
+  .iipe-user-menu > summary,
+  .iipe-notif > summary,
+  .iipe-theme-toggle {
+    min-height: 40px;
+  }
+}
+
+/* ---------- Component polish ----------------------------------------- */
+
+/* Keyboard focus on the custom (non form-control) interactive elements. */
+.iipe-btn:focus-visible,
+.iipe-nav-item:focus-visible,
+.iipe-sidebar-item:focus-visible,
+.iipe-sidebar-toggle:focus-visible,
+.iipe-theme-toggle:focus-visible,
+.iipe-dropdown a:focus-visible,
+.iipe-dropdown button:focus-visible {
+  outline: 2px solid var(--iipe-accent);
+  outline-offset: 2px;
+}
+
+/* Pill badges hug adjacent text instead of inheriting body line-height. */
+.iipe-badge {
+  line-height: 1.4;
+}
+
+/* Numbers line up in columns (dates, quantities, amounts, hours). */
+.iipe-table td {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Card links respond on hover/focus. */
+.iipe-card {
+  transition: box-shadow 0.16s ease, border-color 0.16s ease;
+}
+a.iipe-card:hover,
+a:hover > .iipe-card {
+  border-color: var(--iipe-primary);
+  box-shadow: 0 6px 18px rgba(16, 40, 34, 0.14);
+  text-decoration: none;
+}
+
+/* Wide tables / scroll areas: slim scrollbar, and no scroll chaining to
+   the page when they are swiped all the way to one side. */
+.iipe-table-scroll,
+.iipe-table-responsive {
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+.iipe-table-scroll::-webkit-scrollbar,
+.iipe-table-responsive::-webkit-scrollbar {
+  height: 8px;
+}
+/* Same treatment for Tailwind-styled wrappers (div.overflow-x-auto). */
+.iipe-content div.overflow-x-auto {
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+/* Honour reduced-motion preferences. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
