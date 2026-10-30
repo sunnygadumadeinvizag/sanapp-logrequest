@@ -32,8 +32,11 @@ export async function GET(request: NextRequest) {
       return res;
     }
 
-    // 3. Local role — App5 owns its own roles. Existing users keep their
-    //    designation; new users start as USER (an ADMIN can change it).
+    // 3. Local role — App5 owns its own roles, synchronized with the portal:
+    //    a user the app matrix marks APP_ADMIN (or a central SUPER_ADMIN) is
+    //    promoted to ADMIN here at sign-in. Existing local designations are
+    //    otherwise kept; new users start as USER.
+    const isAdmin = access.role === "APP_ADMIN" || user.role === "SUPER_ADMIN";
     const localUser = await prisma.appUser.upsert({
       where: { username: user.username },
       update: {
@@ -41,6 +44,7 @@ export async function GET(request: NextRequest) {
         name: user.name,
         email: user.email,
         primaryRole: user.primaryRole ?? user.role ?? undefined,
+        ...(isAdmin ? { role: "ADMIN" } : {}),
       },
       create: {
         ssoUserId: user.sub,
@@ -48,7 +52,7 @@ export async function GET(request: NextRequest) {
         name: user.name,
         email: user.email,
         primaryRole: user.primaryRole ?? user.role ?? null,
-        role: "USER",
+        role: isAdmin ? "ADMIN" : "USER",
       },
     });
 
